@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
 // Tu configuración de Firebase
 const firebaseConfig = {
@@ -16,3 +17,4 @@ const app = initializeApp(firebaseConfig);
 
 // Exporta el objeto auth para usarlo en tu app
 export const auth = getAuth(app);
+export const db = getFirestore(app); // <-- AGREGA ESTA LÍNEA

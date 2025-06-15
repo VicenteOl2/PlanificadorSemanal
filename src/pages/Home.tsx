@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import html2canvas from "html2canvas";
+import { db } from "../firebaseConfig";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 
 const dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 const colores = [
@@ -12,6 +14,23 @@ const Home: React.FC<{ userEmail: string }> = ({ userEmail }) => {
   const [animados, setAnimados] = useState<{ [dia: string]: boolean }>({});
   const [mensaje, setMensaje] = useState("");
 
+useEffect(() => {
+    const cargarTareas = async () => {
+      const ref = doc(db, "planes", userEmail);
+      const snap = await getDoc(ref);
+      if (snap.exists()) setTareas(snap.data().tareas || {});
+    };
+    cargarTareas();
+  }, [userEmail]);
+
+    useEffect(() => {
+    if (Object.keys(tareas).length === 0) return; // Evita guardar si está vacío al cargar
+    const guardarTareas = async () => {
+      const ref = doc(db, "planes", userEmail);
+      await setDoc(ref, { tareas });
+    };
+    guardarTareas();
+  }, [tareas, userEmail]);
   const handleInputChange = (dia: string, value: string) => setNuevaTarea({ ...nuevaTarea, [dia]: value });
 
   const agregarTarea = (dia: string) => {
@@ -26,20 +45,25 @@ const Home: React.FC<{ userEmail: string }> = ({ userEmail }) => {
     setTareas({ ...tareas, [dia]: tareas[dia].filter((_, i) => i !== index) });
   };
 
-  // GUARDAR COMO IMAGEN Y SIMULAR ENVÍO
   const handleGuardar = async () => {
+    // Guarda en Firestore
+    const ref = doc(db, "planes", userEmail);
+    await setDoc(ref, { tareas });
+    setMensaje("¡Planificador guardado en la nube!");
+
+    // También genera imagen (opcional)
     const planDiv = document.getElementById("planificador-semanal");
     if (planDiv) {
       const canvas = await html2canvas(planDiv);
       const imgData = canvas.toDataURL("image/png");
-      setMensaje("¡Planificador guardado! (Aquí se enviaría por correo a " + userEmail + ")");
       // Aquí podrías enviar imgData a un backend o usar EmailJS
     }
+    
   };
+  
 
   return (
     <div>
-      <style>{/* ...tus estilos aquí... */}</style>
       <h1 style={{ textAlign: 'center', color: '#ffb347', marginBottom: 30, letterSpacing: 2, textShadow: '2px 2px 8px #000' }}>Planificador Semanal</h1>
       <div id="planificador-semanal" style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', justifyContent: 'center' }}>
         {dias.map((dia, i) => (
