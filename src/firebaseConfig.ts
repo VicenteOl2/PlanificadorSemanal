@@ -18,3 +18,4 @@ const app = initializeApp(firebaseConfig);
 // Exporta el objeto auth para usarlo en tu app
 export const auth = getAuth(app);
 export const db = getFirestore(app); // <-- AGREGA ESTA LÍNEA
+export const firebaseApp = initializeApp(firebaseConfig);

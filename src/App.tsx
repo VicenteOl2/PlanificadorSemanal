@@ -1,83 +1,95 @@
 import React, { useState, useEffect } from "react";
+import { BrowserRouter as Router, Routes, Route, useNavigate } from "react-router-dom";
 import { auth } from "./firebaseConfig";
 import {
-  createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
   User,
 } from "firebase/auth";
 import Home from "./pages/Home";
+import Auth from "./pages/Auth";
+import "./Auth.css";
+import { requestNotificationPermission } from "./firebaseMessaging"; // <-- AGREGA ESTE IMPORT
 
-const AuthMenu: React.FC<{ user: User | null }> = ({ user }) => {
-  const [email, setEmail] = useState("");
-  const [pass, setPass] = useState("");
-  const [isRegister, setIsRegister] = useState(false);
+// Componente para manejar la autenticación y navegación
+const AuthWrapper: React.FC = () => {
+  const [user, setUser] = useState<User | null>(null);
   const [error, setError] = useState("");
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser);
+      if (firebaseUser) {
+        navigate("/home");
+      } else {
+        navigate("/");
+      }
+    });
+    return () => unsub();
+    // eslint-disable-next-line
+  }, []);
 
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // <-- AGREGA ESTE useEffect DESPUÉS DEL useEffect ANTERIOR
+  useEffect(() => {
+    if (user) {
+      requestNotificationPermission();
+    }
+  }, [user]);
+
+  const handleAuth = async (email: string, password: string) => {
     setError("");
     try {
-      if (isRegister) {
-        await createUserWithEmailAndPassword(auth, email, pass);
-      } else {
-        await signInWithEmailAndPassword(auth, email, pass);
-      }
+      await signInWithEmailAndPassword(auth, email, password);
+      // La navegación a /home se maneja en el useEffect
     } catch (err: any) {
       setError(err.message);
     }
   };
 
-  return user ? (
-    <div style={{ textAlign: "center", margin: 20 }}>
-      <span>Sesión iniciada como <b>{user.email}</b></span>
-      <button onClick={() => signOut(auth)} style={{ marginLeft: 10 }}>Cerrar sesión</button>
-    </div>
-  ) : (
-    <form onSubmit={handleAuth} style={{ textAlign: "center", margin: 20 }}>
-      <h2>{isRegister ? "Registro" : "Iniciar sesión"}</h2>
-      <input
-        type="email"
-        placeholder="Correo"
-        value={email}
-        onChange={e => setEmail(e.target.value)}
-        required
-        style={{ margin: 5 }}
-      />
-      <input
-        type="password"
-        placeholder="Contraseña"
-        value={pass}
-        onChange={e => setPass(e.target.value)}
-        required
-        style={{ margin: 5 }}
-      />
-      <button type="submit">{isRegister ? "Registrarse" : "Entrar"}</button>
-      <div>
-        <button type="button" onClick={() => setIsRegister(!isRegister)} style={{ marginTop: 10 }}>
-          {isRegister ? "¿Ya tienes cuenta? Inicia sesión" : "¿No tienes cuenta? Regístrate"}
-        </button>
-      </div>
-      {error && <div style={{ color: "red" }}>{error}</div>}
-    </form>
-  );
-};
-
-const App: React.FC = () => {
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, setUser);
-    return () => unsub();
-  }, []);
+  const handleSignOut = async () => {
+    await signOut(auth);
+    // La navegación a / se maneja en el useEffect
+  };
 
   return (
-    <div>
-      <AuthMenu user={user} />
-      {user && <Home userEmail={user.email || ""} />}
-    </div>
+    <>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            !user ? (
+              <>
+                <Auth onAuth={handleAuth} />
+                {error && <div style={{ color: "red", textAlign: "center" }}>{error}</div>}
+              </>
+            ) : null
+          }
+        />
+        <Route
+          path="/home"
+          element={
+            user ? (
+              <>
+                <div style={{ textAlign: "center", margin: 20 }}>
+                  <span>Sesión iniciada como <b>{user.email}</b></span>
+                  <button onClick={handleSignOut} style={{ marginLeft: 10 }}>Cerrar sesión</button>
+                </div>
+                <Home userEmail={user.email || ""} />
+              </>
+            ) : null
+          }
+        />
+      </Routes>
+    </>
   );
 };
+
+const App: React.FC = () => (
+  <Router>
+    <AuthWrapper />
+  </Router>
+);
 
 export default App;
