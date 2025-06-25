@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import html2canvas from "html2canvas";
 import { db } from "../firebaseConfig";
 import { doc, setDoc, getDoc } from "firebase/firestore";
+import { Link } from "react-router-dom"; 
+import ListaNegocios from "../components/ListaNegocios"; // <-- Importa el componente aquí
 
 const dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 const colores = [
@@ -14,7 +16,7 @@ const Home: React.FC<{ userEmail: string }> = ({ userEmail }) => {
   const [animados, setAnimados] = useState<{ [dia: string]: boolean }>({});
   const [mensaje, setMensaje] = useState("");
 
-useEffect(() => {
+  useEffect(() => {
     const cargarTareas = async () => {
       const ref = doc(db, "planes", userEmail);
       const snap = await getDoc(ref);
@@ -23,7 +25,7 @@ useEffect(() => {
     cargarTareas();
   }, [userEmail]);
 
-    useEffect(() => {
+  useEffect(() => {
     if (Object.keys(tareas).length === 0) return; // Evita guardar si está vacío al cargar
     const guardarTareas = async () => {
       const ref = doc(db, "planes", userEmail);
@@ -58,13 +60,34 @@ useEffect(() => {
       const imgData = canvas.toDataURL("image/png");
       // Aquí podrías enviar imgData a un backend o usar EmailJS
     }
-    
   };
-  
 
   return (
     <div>
-      <h1 style={{ textAlign: 'center', color: '#ffb347', marginBottom: 30, letterSpacing: 2, textShadow: '2px 2px 8px #000' }}>Planificador Semanal</h1>
+      <ListaNegocios /> {/* <-- Aquí se muestra la lista de negocios */}
+      <h1 style={{ textAlign: 'center', color: '#ffb347', marginBottom: 30, letterSpacing: 2, textShadow: '2px 2px 8px #000' }}>
+        Planificador Semanal
+      </h1>
+      {/* Botón para ir al calendario */}
+      <div style={{ textAlign: "center", marginBottom: "20px" }}>
+        <Link
+          to="/calendar"
+          style={{
+            display: "inline-block",
+            padding: "0.75rem 2rem",
+            background: "#1976d2",
+            color: "#fff",
+            borderRadius: "8px",
+            textDecoration: "none",
+            fontWeight: "bold",
+            fontSize: "1.1rem",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+            transition: "background 0.2s"
+          }}
+        >
+          Ir al Calendario
+        </Link>
+      </div>
       <div id="planificador-semanal" style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', justifyContent: 'center' }}>
         {dias.map((dia, i) => (
           <div key={dia} className="card-dia" style={{

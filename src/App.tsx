@@ -10,14 +10,20 @@ import {
 import Home from "./pages/Home";
 import Auth from "./pages/Auth";
 import "./Auth.css";
-import { requestNotificationPermission } from "./firebaseMessaging"; // <-- AGREGA ESTE IMPORT
+import { requestNotificationPermission } from "./firebaseMessaging";
+import CalendarPage from "./pages/CalendarPage";
+import BarraNavegacion from "./components/BarraNavegacion";
+import NegocioDetalle from "./components/NegocioDetalle";
+import ReservasNegocio from "./components/ReservasNegocio";
+
+
 
 // Componente para manejar la autenticación y navegación
 const AuthWrapper: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [error, setError] = useState("");
   const navigate = useNavigate();
-  
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
@@ -31,7 +37,6 @@ const AuthWrapper: React.FC = () => {
     // eslint-disable-next-line
   }, []);
 
-  // <-- AGREGA ESTE useEffect DESPUÉS DEL useEffect ANTERIOR
   useEffect(() => {
     if (user) {
       requestNotificationPermission();
@@ -53,39 +58,36 @@ const AuthWrapper: React.FC = () => {
     // La navegación a / se maneja en el useEffect
   };
 
+  // Si el usuario NO está autenticado, solo muestra el login
+  if (!user) {
+    return (
+      <>
+        <Auth onAuth={handleAuth} />
+        {error && <div style={{ color: "red", textAlign: "center" }}>{error}</div>}
+      </>
+    );
+  }
+
+  // Si el usuario está autenticado, muestra la barra y las rutas internas
   return (
     <>
+      <BarraNavegacion />
+      <div style={{ textAlign: "center", margin: 20 }}>
+        <span>Sesión iniciada como <b>{user.email}</b></span>
+        <button onClick={handleSignOut} style={{ marginLeft: 10 }}>Cerrar sesión</button>
+      </div>
       <Routes>
-        <Route
-          path="/"
-          element={
-            !user ? (
-              <>
-                <Auth onAuth={handleAuth} />
-                {error && <div style={{ color: "red", textAlign: "center" }}>{error}</div>}
-              </>
-            ) : null
-          }
-        />
-        <Route
-          path="/home"
-          element={
-            user ? (
-              <>
-                <div style={{ textAlign: "center", margin: 20 }}>
-                  <span>Sesión iniciada como <b>{user.email}</b></span>
-                  <button onClick={handleSignOut} style={{ marginLeft: 10 }}>Cerrar sesión</button>
-                </div>
-                <Home userEmail={user.email || ""} />
-              </>
-            ) : null
-          }
-        />
+        <Route path="/home" element={<Home userEmail={user.email || ""} />} />
+        <Route path="/calendar" element={<CalendarPage />} />
+        <Route path="*" element={<Home userEmail={user.email || ""} />} />
+        <Route path="/negocio/:id" element={<NegocioDetalle />} />
+        <Route path="/negocio/:id/reservas" element={<ReservasNegocio />} />
       </Routes>
     </>
   );
 };
 
+// Estructura principal de la aplicación
 const App: React.FC = () => (
   <Router>
     <AuthWrapper />
