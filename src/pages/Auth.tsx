@@ -1,51 +1,47 @@
+// src/pages/Auth.tsx
 import React, { useState } from "react";
-import "../Auth.css";
+import { useNavigate, Link } from "react-router-dom";
+import { auth } from "../firebaseConfig";
+import { signInWithEmailAndPassword } from "firebase/auth";
 
-interface AuthProps {
-  onAuth: (email: string, password: string, isRegister: boolean) => void;
-}
-
-const Auth: React.FC<AuthProps> = ({ onAuth }) => {
+const Auth: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isRegister, setIsRegister] = useState(false);
+  const [error, setError] = useState("");
+  const navigate = useNavigate();              // ← Hook DENTRO de un Router
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onAuth(email, password, isRegister);
+    setError("");
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      navigate("/home", { replace: true });     // ← Funciona ahora
+    } catch (err: any) {
+      setError(err.message);
+    }
   };
 
   return (
-    <div className="auth-bg">
-      <div className="auth-card">
-        <img src="/logo.png" alt="Logo" className="auth-logo" />
-        <h2>{isRegister ? "Registro" : "Iniciar sesión"}</h2>
-        <form onSubmit={handleSubmit}>
-          <input
-            type="email"
-            placeholder="Correo electrónico"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-          />
-          <input
-            type="password"
-            placeholder="Contraseña"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-          />
-          <button type="submit">{isRegister ? "Registrarse" : "Entrar"}</button>
-        </form>
-        <div className="auth-footer">
-          <button
-            type="button"
-            onClick={() => setIsRegister(!isRegister)}
-            style={{ background: "none", border: "none", color: "#1976d2", cursor: "pointer", textDecoration: "underline" }}
-          >
-            {isRegister ? "¿Ya tienes cuenta? Inicia sesión" : "¿No tienes cuenta? Regístrate"}
-          </button>
-        </div>
-      </div>
-    </div>
+    <form onSubmit={handleSubmit} style={{ maxWidth: 320, margin: "100px auto" }}>
+      <h2>Iniciar sesión</h2>
+      <input
+        type="email"
+        placeholder="Correo"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+      />
+      <input
+        type="password"
+        placeholder="Contraseña"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+      />
+      <button type="submit">Entrar</button>
+      {error && <p style={{ color: "red" }}>{error}</p>}
+      <p style={{ marginTop: 12 }}>
+        ¿No tienes cuenta? <Link to="/registro">Regístrate</Link>
+      </p>
+    </form>
   );
 };
 

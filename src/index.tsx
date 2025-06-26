@@ -1,23 +1,23 @@
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-import CustomChakraProvider from './ChakraProvider';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
+// src/index.tsx
+import React from "react";
+import { createRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";   // ← Importa BrowserRouter
+import CustomChakraProvider from "./ChakraProvider";
+import { ThemeProvider, createTheme } from "@mui/material/styles";
+import App from "./App";
 
-// Importa tu componente App principal
-import App from './App';
-
-// Configuración del root para React 18
-const container = document.getElementById('root');
-const root = createRoot(container!);
-
-const muiTheme = createTheme(); // Podés personalizarlo más adelante si querés
+const container = document.getElementById("root")!;
+const root = createRoot(container);
+const muiTheme = createTheme();
 
 root.render(
   <React.StrictMode>
-    <ThemeProvider theme={muiTheme}>
-      <CustomChakraProvider>
-        <App />
-      </CustomChakraProvider>
-    </ThemeProvider>
+    <BrowserRouter>                               {/* ← Envuelve AQUÍ */}
+      <ThemeProvider theme={muiTheme}>
+        <CustomChakraProvider>
+          <App />
+        </CustomChakraProvider>
+      </ThemeProvider>
+    </BrowserRouter>
   </React.StrictMode>
 );
