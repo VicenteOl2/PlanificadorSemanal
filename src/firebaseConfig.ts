@@ -6,12 +6,12 @@ import { getFirestore } from "firebase/firestore";
 
 // Configuración de tu proyecto en Firebase
 const firebaseConfig = {
-  apiKey: "AIzaSyB2zb6infDtNEHOLHMdKLO2ubz_8lHk8Bw",
-  authDomain: "planificador-semanal-3c2b0.firebaseapp.com",
-  projectId: "planificador-semanal-3c2b0",
-  storageBucket: "planificador-semanal-3c2b0.appspot.com",
-  messagingSenderId: "326031876047",
-  appId: "1:326031876047:web:a87fa3326d948188a93cba",
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.REACT_APP_FIREBASE_APP_ID,
 };
 
 // Inicializa la app solo una vez
