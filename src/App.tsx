@@ -30,7 +30,7 @@ const App: React.FC = () => {
 
         {/* PRIVADAS */}
         <Route element={<RequireAuth />}>
-          <Route path="/home" element={<Home userEmail="prueba@email.com"/>} />
+          <Route path="/home" element={<Home />} />
           <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/negocio/:id" element={<NegocioDetalle />} />
           <Route path="/negocio/:id/reservas" element={<ReservasNegocio />} />

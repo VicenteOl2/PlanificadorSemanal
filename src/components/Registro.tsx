@@ -40,33 +40,31 @@ const Registro: React.FC = () => {
   const borderColor = useColorModeValue('gray.200', 'gray.600');
 
   const handleRegistro = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setErrorMsg('');
-    setSuccessMsg('');
+  e.preventDefault();
+  setLoading(true);
+  setErrorMsg('');
+  setSuccessMsg('');
 
-    try {
-      await createUserWithEmailAndPassword(auth, email, password);
-      await signOut(auth);
-      setSuccessMsg('✅ Cuenta creada con éxito. Inicia sesión desde el menú principal.');
-      setEmail('');
-      setPassword('');
-      setTimeout(() => {
+  try {
+    await createUserWithEmailAndPassword(auth, email, password);
+    setSuccessMsg('✅ Cuenta creada con éxito. Redirigiendo...');
+    setEmail('');
+    setPassword('');
+    setTimeout(() => {
       navigate("/");
     }, 1200);
-    } catch (error: any) {
-      if (error.code === 'auth/email-already-in-use') {
-        setErrorMsg('⚠️ Ya estás registrado. Inicia sesión desde el menú principal.');
-      } else if (error.code === 'auth/weak-password') {
-        setErrorMsg('⚠️ La contraseña debe tener al menos 6 caracteres.');
-      } else {
-        setErrorMsg('❌ Ocurrió un error inesperado al registrarse.');
-      }
-    } finally {
-      setLoading(false);
+  } catch (error: any) {
+    if (error.code === 'auth/email-already-in-use') {
+      setErrorMsg('⚠️ Ya estás registrado. Inicia sesión desde el menú principal.');
+    } else if (error.code === 'auth/weak-password') {
+      setErrorMsg('⚠️ La contraseña debe tener al menos 6 caracteres.');
+    } else {
+      setErrorMsg('❌ Ocurrió un error inesperado al registrarse.');
     }
-  };
-
+  } finally {
+    setLoading(false);
+  }
+};
   if (loading) {
     return (
       <Box mt={20} textAlign="center">
@@ -151,6 +149,7 @@ const Registro: React.FC = () => {
         <Button
          colorScheme="teal"
         leftIcon={<Icon as={FaUserPlus as React.ElementType} />}
+        type="submit"
         >
         Registrarse
         </Button>

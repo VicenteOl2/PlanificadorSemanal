@@ -2,14 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box, Heading, Text, Input, Button, SimpleGrid, VStack, HStack, Textarea, List, ListItem,
-  Menu, MenuButton, MenuList, MenuItem, IconButton, Modal, ModalOverlay, ModalContent, ModalHeader, ModalCloseButton, ModalBody, useDisclosure
+  Menu, MenuButton, MenuList, MenuItem, IconButton, Modal, ModalOverlay, ModalContent, ModalHeader, ModalCloseButton, ModalBody, useDisclosure, Spinner
 } from '@chakra-ui/react';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { db } from "../firebaseConfig";
 import { doc, setDoc, getDoc } from "firebase/firestore";
-import { getAuth, signOut } from "firebase/auth";
-import { Link } from "react-router-dom";
+import { getAuth, signOut, onAuthStateChanged, User } from "firebase/auth";
+import { Link, useNavigate } from "react-router-dom";
 import ListaNegocios from "../components/ListaNegocios";
 
 // ICONOS DE MUI
@@ -25,27 +25,42 @@ interface Tarea {
   fecha: string; // formato ISO
 }
 
-interface HomeProps {
-  userEmail: string;
-}
-
-const Home: React.FC<HomeProps> = ({ userEmail }) => {
+const Home: React.FC = () => {
   const [tareas, setTareas] = useState<{ [dia: string]: Tarea[] }>({});
   const [nuevaTarea, setNuevaTarea] = useState<{ [dia: string]: string }>({});
   const [objetivos, setObjetivos] = useState<{ [semana: string]: string[] }>({});
   const [notas, setNotas] = useState<{ [semana: string]: string }>({});
   const [mensaje, setMensaje] = useState("");
   const [fechaSeleccionada, setFechaSeleccionada] = useState<Date>(new Date());
-  const [perfil, setPerfil] = useState({ nombre: "Usuario", email: userEmail });
+  const [perfil, setPerfil] = useState<{ nombre: string; email: string }>({ nombre: "Usuario", email: "" });
   const [editando, setEditando] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   // Modales
   const { isOpen, onOpen, onClose } = useDisclosure(); // Negocios
   const perfilModal = useDisclosure(); // Perfil
+  const navigate = useNavigate();
+
+  // Obtener usuario autenticado y su email
+  useEffect(() => {
+    const auth = getAuth();
+    const unsubscribe = onAuthStateChanged(auth, (user: User | null) => {
+      if (user && user.email) {
+        setUserEmail(user.email);
+        setPerfil(prev => ({ ...prev, email: user.email! }));
+      } else {
+        setUserEmail(null);
+        setPerfil(prev => ({ ...prev, email: "" }));
+        navigate("/login");
+      }
+    });
+    return () => unsubscribe();
+    // eslint-disable-next-line
+  }, []);
 
   // Calcula los días de la semana (de lunes a domingo) para la fecha seleccionada
   function getDiasSemana(fecha: Date) {
-    // Lunes = 1, Domingo = 0
     const diaSemana = fecha.getDay() === 0 ? 7 : fecha.getDay();
     const lunes = new Date(fecha);
     lunes.setDate(fecha.getDate() - (diaSemana - 1));
@@ -57,12 +72,16 @@ const Home: React.FC<HomeProps> = ({ userEmail }) => {
   }
 
   const diasSemana = getDiasSemana(fechaSeleccionada);
-  const semanaClave = diasSemana[0].toISOString().slice(0, 10); // lunes de la semana
+  const semanaClave = diasSemana[0].toISOString().slice(0, 10);
 
   // Cargar tareas y objetivos
   useEffect(() => {
-    if (!userEmail) return;
+    if (!userEmail) {
+      setLoading(false);
+      return;
+    }
     const cargar = async () => {
+      setLoading(true);
       const ref = doc(db, "planes", userEmail);
       const snap = await getDoc(ref);
       if (snap.exists()) {
@@ -70,7 +89,12 @@ const Home: React.FC<HomeProps> = ({ userEmail }) => {
         setTareas(data.tareas || {});
         setObjetivos(data.objetivos || {});
         setNotas(data.notas || {});
+      } else {
+        setTareas({});
+        setObjetivos({});
+        setNotas({});
       }
+      setLoading(false);
     };
     cargar();
   }, [userEmail]);
@@ -138,6 +162,15 @@ const Home: React.FC<HomeProps> = ({ userEmail }) => {
     window.location.href = "/login";
   };
 
+  if (loading) {
+    return (
+      <Box minH="100vh" display="flex" alignItems="center" justifyContent="center">
+        <Spinner size="xl" color="teal.400" />
+        <Text ml={4}>Cargando tu planificador...</Text>
+      </Box>
+    );
+  }
+
   return (
     <Box 
       minH="100vh"
@@ -152,114 +185,110 @@ const Home: React.FC<HomeProps> = ({ userEmail }) => {
         overflowX: "hidden"
       }}
     >
-      {/* Ruedita de configuración fuera del flujo principal */}
-      <Box position="absolute" top="24px" right="24px" zIndex={200}>
-        <Menu>
-          <MenuButton
-            as={IconButton}
-      icon={<SettingsIcon />}
-      aria-label="Configuración"
-      position="absolute"
-      top="24px"
-      right="24px"
-      zIndex={200}
-      colorScheme="gray"
-      borderRadius="full"
-      boxShadow="md"
-          />
-          <MenuList>
-            <MenuItem icon={<StoreMallDirectoryIcon />} onClick={onOpen}>
-              Negocios
-            </MenuItem>
-            <MenuItem icon={<PersonIcon />} onClick={perfilModal.onOpen}>
-              Perfil Usuario
-            </MenuItem>
-            <MenuItem icon={<LogoutIcon />} onClick={handleCerrarSesion}>
-              Cerrar sesión
-            </MenuItem>
-            <MenuItem>
-              ¿Quieres implementar tu negocio?{" "}
-              <a
-                href="mailto:contacto@tusitio.com"
-                style={{ color: "#3182ce", marginLeft: 4, textDecoration: "underline" }}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Contáctanos
-              </a>
-            </MenuItem>
-          </MenuList>
-        </Menu>
-      </Box>
-
-      {/* Modal de negocios: muestra la lista dinámica */}
-      <Modal isOpen={isOpen} onClose={onClose}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Negocios disponibles</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <ListaNegocios />
-            <Text mt={4} fontSize="sm">
-              ¿Quieres implementar tu negocio?{" "}
-              <a
-                href="mailto:contacto@tusitio.com"
-                style={{ color: "#3182ce", textDecoration: "underline" }}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Contáctanos
-              </a>
-            </Text>
-          </ModalBody>
-        </ModalContent>
-      </Modal>
-
-      {/* Modal de perfil editable */}
-      <Modal isOpen={perfilModal.isOpen} onClose={perfilModal.onClose}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Perfil de Usuario</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            {editando ? (
-              <>
-                <Input
-                  mb={2}
-                  value={perfil.nombre}
-                  onChange={e => setPerfil({ ...perfil, nombre: e.target.value })}
-                  placeholder="Nombre"
-                />
-                <Input
-                  mb={2}
-                  value={perfil.email}
-                  onChange={e => setPerfil({ ...perfil, email: e.target.value })}
-                  placeholder="Email"
-                />
-                <Button
-                  colorScheme="blue"
-                  size="sm"
-                  onClick={() => setEditando(false)}
-                  mb={2}
+      <Box maxW="1200px" mx="auto" mt={4} p={2} position="relative">
+        {/* Ruedita de configuración dentro del contenedor principal */}
+        <Box position="absolute" top="0" right="0" zIndex={200}>
+          <Menu>
+            <MenuButton
+              as={IconButton}
+              icon={<SettingsIcon />}
+              aria-label="Configuración"
+              colorScheme="gray"
+              borderRadius="full"
+              boxShadow="md"
+            />
+            <MenuList>
+              <MenuItem icon={<StoreMallDirectoryIcon />} onClick={onOpen}>
+                Negocios
+              </MenuItem>
+              <MenuItem icon={<PersonIcon />} onClick={perfilModal.onOpen}>
+                Perfil Usuario
+              </MenuItem>
+              <MenuItem icon={<LogoutIcon />} onClick={handleCerrarSesion}>
+                Cerrar sesión
+              </MenuItem>
+              <MenuItem>
+                ¿Quieres implementar tu negocio?{" "}
+                <a
+                  href="mailto:contacto@tusitio.com"
+                  style={{ color: "#3182ce", marginLeft: 4, textDecoration: "underline" }}
+                  target="_blank"
+                  rel="noopener noreferrer"
                 >
-                  Guardar
-                </Button>
-              </>
-            ) : (
-              <>
-                <Text><b>Nombre:</b> {perfil.nombre}</Text>
-                <Text><b>Email:</b> {perfil.email}</Text>
-                <Button mt={3} colorScheme="blue" size="sm" onClick={() => setEditando(true)}>
-                  Editar
-                </Button>
-              </>
-            )}
-          </ModalBody>
-        </ModalContent>
-      </Modal>
+                  Contáctanos
+                </a>
+              </MenuItem>
+            </MenuList>
+          </Menu>
+        </Box>
 
-      {/* ...resto del contenido igual... */}
-      <Box maxW="1200px" mx="auto" mt={4} p={2}>
+        {/* Modal de negocios: muestra la lista dinámica */}
+        <Modal isOpen={isOpen} onClose={onClose}>
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>Negocios disponibles</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              <ListaNegocios />
+              <Text mt={4} fontSize="sm">
+                ¿Quieres implementar tu negocio?{" "}
+                <a
+                  href="mailto:contacto@tusitio.com"
+                  style={{ color: "#3182ce", textDecoration: "underline" }}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Contáctanos
+                </a>
+              </Text>
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+
+        {/* Modal de perfil editable */}
+        <Modal isOpen={perfilModal.isOpen} onClose={perfilModal.onClose}>
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>Perfil de Usuario</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              {editando ? (
+                <>
+                  <Input
+                    mb={2}
+                    value={perfil.nombre}
+                    onChange={e => setPerfil({ ...perfil, nombre: e.target.value })}
+                    placeholder="Nombre"
+                  />
+                  <Input
+                    mb={2}
+                    value={perfil.email}
+                    onChange={e => setPerfil({ ...perfil, email: e.target.value })}
+                    placeholder="Email"
+                  />
+                  <Button
+                    colorScheme="blue"
+                    size="sm"
+                    onClick={() => setEditando(false)}
+                    mb={2}
+                  >
+                    Guardar
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Text><b>Nombre:</b> {perfil.nombre}</Text>
+                  <Text><b>Email:</b> {perfil.email}</Text>
+                  <Button mt={3} colorScheme="blue" size="sm" onClick={() => setEditando(true)}>
+                    Editar
+                  </Button>
+                </>
+              )}
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+
+        {/* ...resto del contenido igual... */}
         <SimpleGrid columns={{ base: 1, md: 4 }} spacing={6}>
           {/* Columna izquierda */}
           <VStack align="stretch" spacing={6} minW="260px">
@@ -316,7 +345,6 @@ const Home: React.FC<HomeProps> = ({ userEmail }) => {
           {/* Columna derecha: días de la semana */}
           <Box gridColumn={{ md: "span 3" }}>
             <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4} mb={4}>
-              {/* Primeros 3 días (Lunes a Miércoles) */}
               {dias.slice(0, 3).map((dia, idx) => (
                 <Box
                   key={dia}
@@ -388,7 +416,6 @@ const Home: React.FC<HomeProps> = ({ userEmail }) => {
               ))}
             </SimpleGrid>
             <SimpleGrid columns={{ base: 1, md: 4 }} spacing={4}>
-              {/* Siguientes 4 días (Jueves a Domingo) */}
               {dias.slice(3).map((dia, idx) => (
                 <Box
                   key={dia}
