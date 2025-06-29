@@ -10,6 +10,7 @@ import Home from "./pages/Home";
 import CalendarPage from "./pages/CalendarPage";
 import NegocioDetalle from "./components/NegocioDetalle";
 import ReservasNegocio from "./components/ReservasNegocio";
+import WeeklyPlanner from "./components/WeeklyPlanner";
 
 const App: React.FC = () => {
   return (
@@ -29,10 +30,11 @@ const App: React.FC = () => {
 
         {/* PRIVADAS */}
         <Route element={<RequireAuth />}>
-          <Route path="/home" element={<Home userEmail=""/>} />
+          <Route path="/home" element={<Home userEmail="prueba@email.com"/>} />
           <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/negocio/:id" element={<NegocioDetalle />} />
           <Route path="/negocio/:id/reservas" element={<ReservasNegocio />} />
+          <Route path="/weekly-planner" element={<WeeklyPlanner />} />
         </Route>
 
         {/* CUALQUIER OTRA → login */}

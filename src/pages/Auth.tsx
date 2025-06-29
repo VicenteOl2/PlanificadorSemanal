@@ -1,47 +1,165 @@
 // src/pages/Auth.tsx
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { auth } from "../firebaseConfig";
 import { signInWithEmailAndPassword } from "firebase/auth";
+import {
+  Flex,
+  Box,
+  Input,
+  Button,
+  Heading,
+  VStack,
+  Alert,
+  AlertIcon,
+  Spinner,
+  Text,
+  Icon,
+} from "@chakra-ui/react";
+import { FaSignInAlt, FaUserPlus } from "react-icons/fa";
+import { motion } from "framer-motion";
+
+const MotionBox = motion(Box);
 
 const Auth: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const navigate = useNavigate();              // ← Hook DENTRO de un Router
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      navigate("/home", { replace: true });     // ← Funciona ahora
+      navigate("/home", { replace: true });
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
+  if (loading) {
+    return (
+      <Box mt={20} textAlign="center">
+        <Spinner size="xl" color="teal.400" />
+        <Text mt={4}>Procesando inicio de sesión...</Text>
+      </Box>
+    );
+  }
+
   return (
-    <form onSubmit={handleSubmit} style={{ maxWidth: 320, margin: "100px auto" }}>
-      <h2>Iniciar sesión</h2>
-      <input
-        type="email"
-        placeholder="Correo"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
-      <input
-        type="password"
-        placeholder="Contraseña"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
-      <button type="submit">Entrar</button>
-      {error && <p style={{ color: "red" }}>{error}</p>}
-      <p style={{ marginTop: 12 }}>
-        ¿No tienes cuenta? <Link to="/registro">Regístrate</Link>
-      </p>
-    </form>
+   <Flex
+  w="100vw"
+  h="100vh"
+  align="center"
+  justify="center"
+  bgGradient="linear(to-br, teal.400, pink.300, yellow.200)"
+  bgSize="200% 200%"
+  animation="gradient 8s ease infinite"
+  sx={{
+    '@keyframes gradient': {
+      '0%': { backgroundPosition: '0% 50%' },
+      '50%': { backgroundPosition: '100% 50%' },
+      '100%': { backgroundPosition: '0% 50%' },
+    },
+  }}
+>
+  <Box position="absolute" top={12} left={0} right={0}>
+    <Heading
+      as="h1"
+      size="2xl"
+      color="white"
+      textAlign="center"
+      letterSpacing="wider"
+      fontWeight="extrabold"
+      textShadow="0 2px 16px rgba(0,0,0,0.18)"
+      userSelect="none"
+      style={{ textTransform: "uppercase" }}
+    >
+      WeeklyPlanner
+    </Heading>
+     </Box>
+      <MotionBox
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8 }}
+        bg="red.700"
+        color="white"
+        p={8}
+        borderRadius="md"
+        boxShadow="0 10px 40px rgba(0,0,0,0.2)"
+        w="100%"
+        maxW="400px"
+        position="relative"
+        border="1px solid rgba(255,255,255,0.2)"
+      >
+        <Heading mb={4} size="lg" textAlign="center" color="teal.500">
+          Iniciar sesión
+        </Heading>
+
+        {error && (
+          <Alert status="error" fontSize="sm" mb={4}>
+            <AlertIcon />
+            {error}
+          </Alert>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <VStack spacing={4}>
+            <Input
+              placeholder="Correo electrónico"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              variant="filled"
+              focusBorderColor="teal.400"
+              isRequired
+            />
+            <Input
+              placeholder="Contraseña"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              variant="filled"
+              focusBorderColor="teal.400"
+              isRequired
+            />
+            <Button
+              colorScheme="teal"
+              leftIcon={<Icon as={FaSignInAlt as React.ElementType} />}
+              type="submit"
+              width="100%"
+              fontWeight="bold"
+              size="md"
+            >
+              Entrar
+            </Button>
+            <Button
+              colorScheme="teal"
+              variant="solid"
+              width="100%"
+              mt={1}
+              fontWeight="bold"
+              size="md"
+              rightIcon={<Icon as={FaUserPlus as React.ElementType} />}
+              onClick={() => navigate("/registro")}
+              _active={{
+                transform: "scale(0.95)",
+                boxShadow: "md",
+              }}
+              transition="all 0.1s"
+            >
+              ¿No tienes cuenta? Regístrate
+            </Button>
+          </VStack>
+        </form>
+      </MotionBox>
+    </Flex>
+   
   );
 };
 
