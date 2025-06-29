@@ -1,8 +1,6 @@
 import react from 'react';
 import React, { useState } from 'react';
-import { transition,
-  Flex,
-  Box,
+import { transition,Flex,Box,
   BoxProps,
   Input,
   Button,
@@ -53,6 +51,9 @@ const Registro: React.FC = () => {
       setSuccessMsg('✅ Cuenta creada con éxito. Inicia sesión desde el menú principal.');
       setEmail('');
       setPassword('');
+      setTimeout(() => {
+      navigate("/");
+    }, 1200);
     } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
         setErrorMsg('⚠️ Ya estás registrado. Inicia sesión desde el menú principal.');
