@@ -96,15 +96,15 @@ const Registro: React.FC = () => {
   initial={{ opacity: 0, y: 20 }}
   animate={{ opacity: 1, y: 0 }}
   transition={{ duration: 0.8 }}
-  bg="red.700"
-  color="white"
+  bg="#ffe5ec" // Cambia aquí el color de fondo
+  color="#22223b"
   p={8}
   borderRadius="md"
-  boxShadow="0 10px 40px rgba(0,0,0,0.2)"
+  boxShadow="0 10px 40px rgba(0,0,0,0.08)"
   w="100%"
   maxW="400px"
   position="relative"
-  border="1px solid rgba(255,255,255,0.2)"
+  border="1px solid #e0e0e0"
 >
 
       <Heading mb={4} size="lg" textAlign="center" color="teal.500">
@@ -128,24 +128,30 @@ const Registro: React.FC = () => {
       <form onSubmit={handleRegistro}>
         <VStack spacing={4}>
           
-          <Input
-            placeholder="Correo electrónico"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            variant="filled"
-            focusBorderColor="teal.400"
-            isRequired
-          />
-          <Input
-            placeholder="Contraseña"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            variant="filled"
-            focusBorderColor="teal.400"
-            isRequired
-          />
+    <Input
+  type="email"
+  placeholder="Correo electrónico"
+  value={email}
+  onChange={(e) => setEmail(e.target.value)}
+  bg="#fff" // Color fondo Box
+  color="#1a202c" // texto oscuro
+  border="2px solid #43a047" // borde verde
+  _placeholder={{ color: "#6b7280" }} // placeholder gris oscuro
+  _focus={{ borderColor: "#1976d2", boxShadow: "0 0 0 2px #1976d255" }}
+  isRequired
+/>
+<Input
+  placeholder="Contraseña"
+  type="password"
+  value={password}
+  onChange={(e) => setPassword(e.target.value)}
+  bg="#fff"
+  color="#1a202c"
+  border="2px solid #43a047"
+  _placeholder={{ color: "#6b7280" }}
+  _focus={{ borderColor: "#1976d2", boxShadow: "0 0 0 2px #1976d255" }}
+  isRequired
+/>
         <Button
          colorScheme="teal"
         leftIcon={<Icon as={FaUserPlus as React.ElementType} />}

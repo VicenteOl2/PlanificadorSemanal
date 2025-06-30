@@ -8,9 +8,11 @@ import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { db } from "../firebaseConfig";
 import { doc, setDoc, getDoc } from "firebase/firestore";
-import { getAuth, signOut, onAuthStateChanged, User } from "firebase/auth";
+import { getAuth, signOut, onAuthStateChanged, User, updateProfile } from "firebase/auth";
 import { Link, useNavigate } from "react-router-dom";
 import ListaNegocios from "../components/ListaNegocios";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { auth } from "../firebaseConfig";
 
 // ICONOS DE MUI
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -23,9 +25,10 @@ const dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', '
 interface Tarea {
   texto: string;
   fecha: string; // formato ISO
+  completada?: boolean;
 }
 
-const Home: React.FC = () => {
+const Home = () => {
   const [tareas, setTareas] = useState<{ [dia: string]: Tarea[] }>({});
   const [nuevaTarea, setNuevaTarea] = useState<{ [dia: string]: string }>({});
   const [objetivos, setObjetivos] = useState<{ [semana: string]: string[] }>({});
@@ -36,6 +39,7 @@ const Home: React.FC = () => {
   const [editando, setEditando] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [user] = useAuthState(auth);
 
   // Modales
   const { isOpen, onOpen, onClose } = useDisclosure(); // Negocios
@@ -48,7 +52,11 @@ const Home: React.FC = () => {
     const unsubscribe = onAuthStateChanged(auth, (user: User | null) => {
       if (user && user.email) {
         setUserEmail(user.email);
-        setPerfil(prev => ({ ...prev, email: user.email! }));
+        setPerfil(prev => ({
+          ...prev,
+          email: user.email!,
+          nombre: user.displayName || "Usuario",
+        }));
       } else {
         setUserEmail(null);
         setPerfil(prev => ({ ...prev, email: "" }));
@@ -104,8 +112,27 @@ const Home: React.FC = () => {
     if (!userEmail) return;
     const ref = doc(db, "planes", userEmail);
     await setDoc(ref, { tareas, objetivos, notas });
-    setMensaje("¡Planificador guardado en la nube!");
+    setMensaje("¡Planificador guardado en la nube!");   
     setTimeout(() => setMensaje(""), 2000);
+  };
+  // Guardar perfil (nombre) en Firebase Auth
+  const handleGuardarPerfil = async () => {
+    if (auth.currentUser) {
+      try {
+        await updateProfile(auth.currentUser, {
+          displayName: perfil.nombre,
+        });
+        setEditando(false);
+        perfilModal.onClose();
+        setPerfil(prev => ({
+          ...prev,
+          nombre: perfil.nombre,
+        }));
+        // Opcional: muestra mensaje de éxito
+      } catch (error) {
+        alert("Error al actualizar el nombre");
+      }
+    }
   };
 
   // Manejo de tareas
@@ -117,6 +144,7 @@ const Home: React.FC = () => {
     const nueva: Tarea = {
       texto: nuevaTarea[dia],
       fecha: fechaDia.toISOString(),
+      completada: false
     };
     setTareas({
       ...tareas,
@@ -124,6 +152,14 @@ const Home: React.FC = () => {
     });
     setNuevaTarea({ ...nuevaTarea, [dia]: '' });
   };
+  const toggleTareaCompletada = (dia: string, idx: number) => {
+  setTareas(prev => ({
+    ...prev,
+    [dia]: prev[dia].map((t, i) =>
+      i === idx ? { ...t, completada: !t.completada } : t
+    ),
+  }));
+};
 
   const eliminarTarea = (dia: string, index: number) => {
     setTareas({
@@ -186,8 +222,23 @@ const Home: React.FC = () => {
       }}
     >
       <Box maxW="1200px" mx="auto" mt={4} p={2} position="relative">
-        {/* Ruedita de configuración dentro del contenedor principal */}
-        <Box position="absolute" top="0" right="0" zIndex={200}>
+        {/* Barra superior con título y menú */}
+        <HStack justify="space-between" align="center" mb={4}>
+          <Heading size="lg" mb={0}>Planificador semanal</Heading>
+          {user && (
+            <Box
+              bg="whiteAlpha.800"
+              px={4}
+              py={2}
+              borderRadius="md"
+              boxShadow="md"
+              fontWeight="bold"
+              color="teal.700"
+              fontSize="md"
+            >
+              {user.displayName || user.email}
+            </Box>
+          )}
           <Menu>
             <MenuButton
               as={IconButton}
@@ -220,9 +271,8 @@ const Home: React.FC = () => {
               </MenuItem>
             </MenuList>
           </Menu>
-        </Box>
-
-        {/* Modal de negocios: muestra la lista dinámica */}
+        </HStack>
+        {/* Modal de negocios */}
         <Modal isOpen={isOpen} onClose={onClose}>
           <ModalOverlay />
           <ModalContent>
@@ -244,7 +294,6 @@ const Home: React.FC = () => {
             </ModalBody>
           </ModalContent>
         </Modal>
-
         {/* Modal de perfil editable */}
         <Modal isOpen={perfilModal.isOpen} onClose={perfilModal.onClose}>
           <ModalOverlay />
@@ -269,7 +318,7 @@ const Home: React.FC = () => {
                   <Button
                     colorScheme="blue"
                     size="sm"
-                    onClick={() => setEditando(false)}
+                    onClick={handleGuardarPerfil}
                     mb={2}
                   >
                     Guardar
@@ -287,13 +336,11 @@ const Home: React.FC = () => {
             </ModalBody>
           </ModalContent>
         </Modal>
-
-        {/* ...resto del contenido igual... */}
+        {/* Contenido principal */}
         <SimpleGrid columns={{ base: 1, md: 4 }} spacing={6}>
           {/* Columna izquierda */}
           <VStack align="stretch" spacing={6} minW="260px">
             <Box>
-              <Heading size="lg" mb={2}>Planificador semanal</Heading>
               <Text fontSize="md" color="gray.600" mb={2}>Mes:</Text>
               <Box borderRadius="md" p={2} mb={4} bg="white">
                 <Calendar
@@ -372,29 +419,42 @@ const Home: React.FC = () => {
                     {dia} <Box as="span" color="gray.500" fontWeight="normal">{diasSemana[idx].getDate()}</Box>
                   </Text>
                   <List spacing={1} mb={2}>
-                    {tareasFiltradas(dia, diasSemana[idx]).map((tarea, i) => (
-                      <ListItem key={i} display="flex" alignItems="center">
-                        <Text
-                          flex="1"
-                          color="#222"
-                          style={{
-                            fontFamily: "'Permanent Marker', cursive",
-                            fontSize: "1.1em",
-                            letterSpacing: "0.5px",
-                            transform: "rotate(-1deg)",
-                            lineHeight: 1.3,
-                          }}
-                        >
-                          {tarea.texto}
-                        </Text>
-                        <Button
-                          size="xs"
-                          colorScheme="red"
-                          ml={2}
-                          onClick={() => eliminarTarea(dia, i)}
-                        >×</Button>
-                      </ListItem>
-                    ))}
+                 {tareasFiltradas(dia, diasSemana[idx]).map((tarea, i) => {
+  // Busca el índice real de la tarea en el array original
+  const idxReal = (tareas[dia] || []).findIndex(
+    t => t.texto === tarea.texto && t.fecha === tarea.fecha
+  );
+  return (
+    <ListItem key={i} display="flex" alignItems="center">
+      <input
+        type="checkbox"
+        checked={tarea.completada || false}
+        onChange={() => toggleTareaCompletada(dia, idxReal)}
+        style={{ marginRight: 8 }}
+      />
+      <Text
+        flex="1"
+        color={tarea.completada ? "gray.400" : "#222"}
+        textDecoration={tarea.completada ? "line-through" : "none"}
+        style={{
+          fontFamily: "'Permanent Marker', cursive",
+          fontSize: "1.1em",
+          letterSpacing: "0.5px",
+          transform: "rotate(-1deg)",
+          lineHeight: 1.3,
+        }}
+      >
+        {tarea.texto}
+      </Text>
+      <Button
+        size="xs"
+        colorScheme="red"
+        ml={2}
+        onClick={() => eliminarTarea(dia, idxReal)}
+      >×</Button>
+    </ListItem>
+  );
+})}
                   </List>
                   <HStack>
                     <Input
@@ -502,7 +562,7 @@ const Home: React.FC = () => {
             )}
           </Box>
         </SimpleGrid>
-      </Box>
+      </Box> 
     </Box>
   );
 };
