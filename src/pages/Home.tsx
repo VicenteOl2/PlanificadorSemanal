@@ -13,6 +13,7 @@ import { Link, useNavigate } from "react-router-dom";
 import ListaNegocios from "../components/ListaNegocios";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "../firebaseConfig";
+import PaletteIcon from '@mui/icons-material/Palette';
 
 // ICONOS DE MUI
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -26,6 +27,7 @@ interface Tarea {
   texto: string;
   fecha: string; // formato ISO
   completada?: boolean;
+  color?: string; // opcional para agregar color a la tarea
 }
 
 const Home = () => {
@@ -40,10 +42,20 @@ const Home = () => {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [user] = useAuthState(auth);
+  const [colorTarea, setColorTarea] = useState<{ [dia: string]: string }>({});
+  const [paleta, setPaleta] = useState([
+    { nombre: "Importante", color: "#e53935" },
+    { nombre: "Casa", color: "#1e88e5" },
+    { nombre: "Gimnasio", color: "#fbc02d" },
+    { nombre: "Salud", color: "#43a047" },
+  ]);
+  const [nuevoColor, setNuevoColor] = useState("#e53935");
+  const [nuevoNombre, setNuevoNombre] = useState("");
 
   // Modales
   const { isOpen, onOpen, onClose } = useDisclosure(); // Negocios
   const perfilModal = useDisclosure(); // Perfil
+  const paletaModal = useDisclosure(); // Paleta
   const navigate = useNavigate();
 
   // Obtener usuario autenticado y su email
@@ -128,7 +140,6 @@ const Home = () => {
           ...prev,
           nombre: perfil.nombre,
         }));
-        // Opcional: muestra mensaje de éxito
       } catch (error) {
         alert("Error al actualizar el nombre");
       }
@@ -144,7 +155,8 @@ const Home = () => {
     const nueva: Tarea = {
       texto: nuevaTarea[dia],
       fecha: fechaDia.toISOString(),
-      completada: false
+      completada: false,
+      color: colorTarea[dia] || paleta[0].color
     };
     setTareas({
       ...tareas,
@@ -153,13 +165,13 @@ const Home = () => {
     setNuevaTarea({ ...nuevaTarea, [dia]: '' });
   };
   const toggleTareaCompletada = (dia: string, idx: number) => {
-  setTareas(prev => ({
-    ...prev,
-    [dia]: prev[dia].map((t, i) =>
-      i === idx ? { ...t, completada: !t.completada } : t
-    ),
-  }));
-};
+    setTareas(prev => ({
+      ...prev,
+      [dia]: prev[dia].map((t, i) =>
+        i === idx ? { ...t, completada: !t.completada } : t
+      ),
+    }));
+  };
 
   const eliminarTarea = (dia: string, index: number) => {
     setTareas({
@@ -224,7 +236,17 @@ const Home = () => {
       <Box maxW="1200px" mx="auto" mt={4} p={2} position="relative">
         {/* Barra superior con título y menú */}
         <HStack justify="space-between" align="center" mb={4}>
-          <Heading size="lg" mb={0}>Planificador semanal</Heading>
+          <HStack>
+            <Heading size="lg" mb={0}>Planificador semanal</Heading>
+            <IconButton
+              aria-label="Editar paleta de colores"
+              icon={<PaletteIcon />}
+              size="sm"
+              ml={2}
+              onClick={paletaModal.onOpen}
+              variant="ghost"
+            />
+          </HStack>
           {user && (
             <Box
               bg="whiteAlpha.800"
@@ -261,7 +283,7 @@ const Home = () => {
               <MenuItem>
                 ¿Quieres implementar tu negocio?{" "}
                 <a
-                  href="mailto:contacto@tusitio.com"
+                  href="mailto:VicWebCraft@gmail.com"
                   style={{ color: "#3182ce", marginLeft: 4, textDecoration: "underline" }}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -272,6 +294,68 @@ const Home = () => {
             </MenuList>
           </Menu>
         </HStack>
+
+        {/* Modal para personalizar paleta */}
+        <Modal isOpen={paletaModal.isOpen} onClose={paletaModal.onClose}>
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>Personaliza tu paleta de colores</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              <VStack spacing={4} align="stretch">
+                <Box>
+                  <Text mb={1}>Color:</Text>
+                  <Input
+                    type="color"
+                    value={nuevoColor}
+                    onChange={e => setNuevoColor(e.target.value)}
+                    width="50px"
+                    height="50px"
+                    p={0}
+                    border="none"
+                    bg="transparent"
+                  />
+                </Box>
+                <Box>
+                  <Text mb={1}>Nombre:</Text>
+                  <Input
+                    value={nuevoNombre}
+                    onChange={e => setNuevoNombre(e.target.value)}
+                    placeholder="Ej: Importante, Casa, etc."
+                  />
+                </Box>
+                <Button
+                  colorScheme="teal"
+                  onClick={() => {
+                    if (!nuevoNombre.trim()) return;
+                    setPaleta([...paleta, { nombre: nuevoNombre, color: nuevoColor }]);
+                    setNuevoNombre("");
+                    setNuevoColor("#e53935");
+                  }}
+                >
+                  Agregar color
+                </Button>
+                <Box>
+                  <Text fontWeight="bold" mb={2}>Tus colores:</Text>
+                  <HStack spacing={2} wrap="wrap">
+                    {paleta.map((p, idx) => (
+                      <Box key={idx} display="flex" alignItems="center">
+                        <Box w="20px" h="20px" bg={p.color} borderRadius="full" border="1px solid #888" mr={2} />
+                        <Text fontSize="sm" mr={2}>{p.nombre}</Text>
+                        <Button
+                          size="xs"
+                          colorScheme="red"
+                          onClick={() => setPaleta(paleta.filter((_, i) => i !== idx))}
+                        >x</Button>
+                      </Box>
+                    ))}
+                  </HStack>
+                </Box>
+              </VStack>
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+
         {/* Modal de negocios */}
         <Modal isOpen={isOpen} onClose={onClose}>
           <ModalOverlay />
@@ -419,42 +503,49 @@ const Home = () => {
                     {dia} <Box as="span" color="gray.500" fontWeight="normal">{diasSemana[idx].getDate()}</Box>
                   </Text>
                   <List spacing={1} mb={2}>
-                 {tareasFiltradas(dia, diasSemana[idx]).map((tarea, i) => {
-  // Busca el índice real de la tarea en el array original
-  const idxReal = (tareas[dia] || []).findIndex(
-    t => t.texto === tarea.texto && t.fecha === tarea.fecha
-  );
-  return (
-    <ListItem key={i} display="flex" alignItems="center">
-      <input
-        type="checkbox"
-        checked={tarea.completada || false}
-        onChange={() => toggleTareaCompletada(dia, idxReal)}
-        style={{ marginRight: 8 }}
-      />
-      <Text
-        flex="1"
-        color={tarea.completada ? "gray.400" : "#222"}
-        textDecoration={tarea.completada ? "line-through" : "none"}
-        style={{
-          fontFamily: "'Permanent Marker', cursive",
-          fontSize: "1.1em",
-          letterSpacing: "0.5px",
-          transform: "rotate(-1deg)",
-          lineHeight: 1.3,
-        }}
-      >
-        {tarea.texto}
-      </Text>
-      <Button
-        size="xs"
-        colorScheme="red"
-        ml={2}
-        onClick={() => eliminarTarea(dia, idxReal)}
-      >×</Button>
-    </ListItem>
-  );
-})}
+                    {tareasFiltradas(dia, diasSemana[idx]).map((tarea, i) => {
+                      const idxReal = (tareas[dia] || []).findIndex(
+                        t => t.texto === tarea.texto && t.fecha === tarea.fecha
+                      );
+                      return (
+                        <ListItem key={i} display="flex" alignItems="center">
+                          <input
+                            type="checkbox"
+                            checked={tarea.completada || false}
+                            onChange={() => toggleTareaCompletada(dia, idxReal)}
+                            style={{ marginRight: 8 }}
+                          />
+                          <Box
+                            w="16px"
+                            h="16px"
+                            borderRadius="4px"
+                            bg={tarea.color || "#bdbdbd"}
+                            border="1px solid #888"
+                            mr={2}
+                          />
+                          <Text
+                            flex="1"
+                            color={tarea.completada ? "gray.400" : "#222"}
+                            textDecoration={tarea.completada ? "line-through" : "none"}
+                            style={{
+                              fontFamily: "'Permanent Marker', cursive",
+                              fontSize: "1.1em",
+                              letterSpacing: "0.5px",
+                              transform: "rotate(-1deg)",
+                              lineHeight: 1.3,
+                            }}
+                          >
+                            {tarea.texto}
+                          </Text>
+                          <Button
+                            size="xs"
+                            colorScheme="red"
+                            ml={2}
+                            onClick={() => eliminarTarea(dia, idxReal)}
+                          >×</Button>
+                        </ListItem>
+                      );
+                    })}
                   </List>
                   <HStack>
                     <Input
@@ -466,6 +557,18 @@ const Home = () => {
                       bg="white"
                       borderRadius="10px"
                     />
+                    {/* Selector de color dinámico */}
+                    <select
+                      style={{ width: 80, height: 32, borderRadius: 6, border: "1px solid #ccc" }}
+                      value={colorTarea[dia] || paleta[0]?.color}
+                      onChange={e => setColorTarea({ ...colorTarea, [dia]: e.target.value })}
+                    >
+                      {paleta.map((p, idx) => (
+                        <option key={idx} value={p.color}>
+                          {p.nombre}
+                        </option>
+                      ))}
+                    </select>
                     <Button
                       size="sm"
                       colorScheme="blue"
@@ -503,29 +606,49 @@ const Home = () => {
                     {dia} <Box as="span" color="gray.500" fontWeight="normal">{diasSemana[idx + 3].getDate()}</Box>
                   </Text>
                   <List spacing={1} mb={2}>
-                    {tareasFiltradas(dia, diasSemana[idx + 3]).map((tarea, i) => (
-                      <ListItem key={i} display="flex" alignItems="center">
-                        <Text
-                          flex="1"
-                          color="#222"
-                          style={{
-                            fontFamily: "'Permanent Marker', cursive",
-                            fontSize: "1.1em",
-                            letterSpacing: "0.5px",
-                            transform: "rotate(-1deg)",
-                            lineHeight: 1.3,
-                          }}
-                        >
-                          {tarea.texto}
-                        </Text>
-                        <Button
-                          size="xs"
-                          colorScheme="red"
-                          ml={2}
-                          onClick={() => eliminarTarea(dia, i)}
-                        >×</Button>
-                      </ListItem>
-                    ))}
+                    {tareasFiltradas(dia, diasSemana[idx + 3]).map((tarea, i) => {
+                      const idxReal = (tareas[dia] || []).findIndex(
+                        t => t.texto === tarea.texto && t.fecha === tarea.fecha
+                      );
+                      return (
+                        <ListItem key={i} display="flex" alignItems="center">
+                          <input
+                            type="checkbox"
+                            checked={tarea.completada || false}
+                            onChange={() => toggleTareaCompletada(dia, idxReal)}
+                            style={{ marginRight: 8 }}
+                          />
+                          <Box
+                            w="16px"
+                            h="16px"
+                            borderRadius="4px"
+                            bg={tarea.color || "#bdbdbd"}
+                            border="1px solid #888"
+                            mr={2}
+                          />
+                          <Text
+                            flex="1"
+                            color={tarea.completada ? "gray.400" : "#222"}
+                            textDecoration={tarea.completada ? "line-through" : "none"}
+                            style={{
+                              fontFamily: "'Permanent Marker', cursive",
+                              fontSize: "1.1em",
+                              letterSpacing: "0.5px",
+                              transform: "rotate(-1deg)",
+                              lineHeight: 1.3,
+                            }}
+                          >
+                            {tarea.texto}
+                          </Text>
+                          <Button
+                            size="xs"
+                            colorScheme="red"
+                            ml={2}
+                            onClick={() => eliminarTarea(dia, idxReal)}
+                          >×</Button>
+                        </ListItem>
+                      );
+                    })}
                   </List>
                   <HStack>
                     <Input
@@ -537,6 +660,18 @@ const Home = () => {
                       bg="white"
                       borderRadius="10px"
                     />
+                    {/* Selector de color dinámico */}
+                    <select
+                      style={{ width: 80, height: 32, borderRadius: 6, border: "1px solid #ccc" }}
+                      value={colorTarea[dia] || paleta[0]?.color}
+                      onChange={e => setColorTarea({ ...colorTarea, [dia]: e.target.value })}
+                    >
+                      {paleta.map((p, idx) => (
+                        <option key={idx} value={p.color}>
+                          {p.nombre}
+                        </option>
+                      ))}
+                    </select>
                     <Button
                       size="sm"
                       colorScheme="blue"
