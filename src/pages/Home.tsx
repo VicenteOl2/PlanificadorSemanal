@@ -2,24 +2,25 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box, Heading, Text, Input, Button, SimpleGrid, VStack, HStack, Textarea, List, ListItem,
-  Menu, MenuButton, MenuList, MenuItem, IconButton, Modal, ModalOverlay, ModalContent, ModalHeader, ModalCloseButton, ModalBody, useDisclosure, Spinner
+  Menu, MenuButton, MenuList, MenuItem, IconButton, Modal, ModalOverlay, ModalContent, ModalHeader, ModalCloseButton, ModalBody, useDisclosure, Spinner, Tooltip, Select
 } from '@chakra-ui/react';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { db } from "../firebaseConfig";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, onSnapshot } from "firebase/firestore";
 import { getAuth, signOut, onAuthStateChanged, User, updateProfile } from "firebase/auth";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import ListaNegocios from "../components/ListaNegocios";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "../firebaseConfig";
-import PaletteIcon from '@mui/icons-material/Palette';
-
-// ICONOS DE MUI
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import SettingsIcon from '@mui/icons-material/Settings';
 import StoreMallDirectoryIcon from '@mui/icons-material/StoreMallDirectory';
 import PersonIcon from '@mui/icons-material/Person';
 import LogoutIcon from '@mui/icons-material/Logout';
+import PaletteIcon from '@mui/icons-material/Palette';
+import AlarmIcon from '@mui/icons-material/Alarm';
+import { nanoid } from "nanoid";
 
 const dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
@@ -27,10 +28,18 @@ interface Tarea {
   texto: string;
   fecha: string; // formato ISO
   completada?: boolean;
-  color?: string; // opcional para agregar color a la tarea
+  color?: string;
+  hora?: string;
 }
 
+const horasDelDia = Array.from({ length: 36 }, (_, i) => {
+  const h = Math.floor(i / 2) + 6; // desde las 6:00
+  const m = i % 2 === 0 ? "00" : "30";
+  return `${h.toString().padStart(2, "0")}:${m}`;
+});
+
 const Home = () => {
+  // --- ESTADOS ---
   const [tareas, setTareas] = useState<{ [dia: string]: Tarea[] }>({});
   const [nuevaTarea, setNuevaTarea] = useState<{ [dia: string]: string }>({});
   const [objetivos, setObjetivos] = useState<{ [semana: string]: string[] }>({});
@@ -49,16 +58,64 @@ const Home = () => {
     { nombre: "Gimnasio", color: "#fbc02d" },
     { nombre: "Salud", color: "#43a047" },
   ]);
+  const [semanaSeleccionadaInput, setSemanaSeleccionadaInput] = useState("");
+  const [semanaColaborativa, setSemanaColaborativa] = useState<string | null>(null);
+  const [codigoInput, setCodigoInput] = useState(""); // Para unirse a una semana
   const [nuevoColor, setNuevoColor] = useState("#e53935");
   const [nuevoNombre, setNuevoNombre] = useState("");
+  const [alarmaModal, setAlarmaModal] = useState<{ abierto: boolean; dia?: string; tarea?: Tarea; hora?: string }>({ abierto: false });
+  const colaboracionModal = useDisclosure(); // <-- Modal de colaboración
 
-  // Modales
+  // --- MODALES ---
   const { isOpen, onOpen, onClose } = useDisclosure(); // Negocios
   const perfilModal = useDisclosure(); // Perfil
   const paletaModal = useDisclosure(); // Paleta
   const navigate = useNavigate();
 
-  // Obtener usuario autenticado y su email
+  // --- FUNCIONES PARA MODAL DE ALARMA ---
+  const abrirModalAlarma = (dia: string, tarea: Tarea) => {
+    setAlarmaModal({ abierto: true, dia, tarea, hora: tarea.hora || "" });
+  };
+  const cerrarModalAlarma = () => {
+    setAlarmaModal({ abierto: false });
+  };
+
+  // --- FUNCIONES COLABORATIVAS ---
+  const crearSemanaColaborativa = async () => {
+    const codigo = nanoid(6).toUpperCase();
+    const ref = doc(db, "semanas", codigo);
+    await setDoc(ref, {
+      codigo,
+      usuarios: [userEmail],
+      tareas: {},
+      objetivos: {},
+      notas: {}
+    });
+    setSemanaColaborativa(codigo);
+    setMensaje(`Semana creada. Código: ${codigo}`);
+    setTimeout(() => setMensaje(""), 3000);
+  };
+
+  const unirseASemana = async () => {
+    const ref = doc(db, "semanas", codigoInput);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      const data = snap.data();
+      if (!data.usuarios.includes(userEmail)) {
+        await setDoc(ref, {
+          ...data,
+          usuarios: [...data.usuarios, userEmail]
+        });
+      }
+      setSemanaColaborativa(codigoInput);
+      setMensaje(`Unido a la semana: ${codigoInput}`);
+      setTimeout(() => setMensaje(""), 3000);
+    } else {
+      alert("Código no válido");
+    }
+  };
+
+  // --- EFECTOS ---
   useEffect(() => {
     const auth = getAuth();
     const unsubscribe = onAuthStateChanged(auth, (user: User | null) => {
@@ -79,7 +136,7 @@ const Home = () => {
     // eslint-disable-next-line
   }, []);
 
-  // Calcula los días de la semana (de lunes a domingo) para la fecha seleccionada
+  // --- FUNCIONES AUXILIARES ---
   function getDiasSemana(fecha: Date) {
     const diaSemana = fecha.getDay() === 0 ? 7 : fecha.getDay();
     const lunes = new Date(fecha);
@@ -94,16 +151,19 @@ const Home = () => {
   const diasSemana = getDiasSemana(fechaSeleccionada);
   const semanaClave = diasSemana[0].toISOString().slice(0, 10);
 
-  // Cargar tareas y objetivos
+  // --- CARGAR DATOS DE FIRESTORE EN TIEMPO REAL ---
   useEffect(() => {
-    if (!userEmail) {
+    if (!userEmail && !semanaColaborativa) {
       setLoading(false);
       return;
     }
-    const cargar = async () => {
-      setLoading(true);
-      const ref = doc(db, "planes", userEmail);
-      const snap = await getDoc(ref);
+    setLoading(true);
+    const ref = semanaColaborativa
+      ? doc(db, "semanas", semanaColaborativa)
+      : doc(db, "planes", userEmail!);
+
+    // Sincronización en tiempo real
+    const unsubscribe = onSnapshot(ref, (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         setTareas(data.tareas || {});
@@ -115,19 +175,22 @@ const Home = () => {
         setNotas({});
       }
       setLoading(false);
-    };
-    cargar();
-  }, [userEmail]);
+    });
 
-  // Guardar en Firestore
+    return () => unsubscribe();
+  }, [userEmail, semanaColaborativa]);
+
+  // --- GUARDAR EN FIRESTORE ---
   const handleGuardar = async () => {
-    if (!userEmail) return;
-    const ref = doc(db, "planes", userEmail);
-    await setDoc(ref, { tareas, objetivos, notas });
-    setMensaje("¡Planificador guardado en la nube!");   
+    const ref = semanaColaborativa
+      ? doc(db, "semanas", semanaColaborativa)
+      : doc(db, "planes", userEmail!);
+    await setDoc(ref, { tareas, objetivos, notas }, { merge: true });
+    setMensaje("¡Planificador guardado en la nube!");
     setTimeout(() => setMensaje(""), 2000);
   };
-  // Guardar perfil (nombre) en Firebase Auth
+
+  // --- GUARDAR PERFIL ---
   const handleGuardarPerfil = async () => {
     if (auth.currentUser) {
       try {
@@ -146,7 +209,7 @@ const Home = () => {
     }
   };
 
-  // Manejo de tareas
+  // --- MANEJO DE TAREAS ---
   const handleInputChange = (dia: string, value: string) =>
     setNuevaTarea({ ...nuevaTarea, [dia]: value });
 
@@ -164,6 +227,7 @@ const Home = () => {
     });
     setNuevaTarea({ ...nuevaTarea, [dia]: '' });
   };
+
   const toggleTareaCompletada = (dia: string, idx: number) => {
     setTareas(prev => ({
       ...prev,
@@ -180,19 +244,18 @@ const Home = () => {
     });
   };
 
-  // Manejo de objetivos por semana
+  // --- MANEJO DE OBJETIVOS Y NOTAS ---
   const handleObjetivoChange = (idx: number, value: string) => {
     const nuevos = [...(objetivos[semanaClave] || ["", "", ""])];
     nuevos[idx] = value;
     setObjetivos({ ...objetivos, [semanaClave]: nuevos });
   };
 
-  // Manejo de notas por semana
   const handleNotaChange = (value: string) => {
     setNotas({ ...notas, [semanaClave]: value });
   };
 
-  // Filtra tareas por día exacto de la semana
+  // --- FILTRAR TAREAS POR DÍA ---
   const tareasFiltradas = (dia: string, fechaDia: Date) =>
     (tareas[dia] || []).filter(tarea => {
       const fecha = new Date(tarea.fecha);
@@ -203,13 +266,14 @@ const Home = () => {
       );
     });
 
-  // Cerrar sesión real con Firebase Auth
+  // --- CERRAR SESIÓN ---
   const handleCerrarSesion = async () => {
     const auth = getAuth();
     await signOut(auth);
     window.location.href = "/login";
   };
 
+  // --- LOADING ---
   if (loading) {
     return (
       <Box minH="100vh" display="flex" alignItems="center" justifyContent="center">
@@ -219,25 +283,27 @@ const Home = () => {
     );
   }
 
+  // --- RETURN ---
   return (
-    <Box 
-      minH="100vh"
-      p={0}
-      style={{
-        backgroundColor: "#fdf6e3",
-        backgroundImage: `
-          linear-gradient(to right, #e0e0e0 1px, transparent 1px),
-          linear-gradient(to bottom, #e0e0e0 1px, transparent 1px)
-        `,
-        backgroundSize: "32px 32px",
-        overflowX: "hidden"
-      }}
-    >
+    <Box minH="100vh" p={0} style={{
+      backgroundColor: "#fdf6e3",
+      backgroundImage: `
+        linear-gradient(to right, #e0e0e0 1px, transparent 1px),
+        linear-gradient(to bottom, #e0e0e0 1px, transparent 1px)
+      `,
+      backgroundSize: "32px 32px",
+      overflowX: "hidden"
+    }}>
       <Box maxW="1200px" mx="auto" mt={4} p={2} position="relative">
         {/* Barra superior con título y menú */}
         <HStack justify="space-between" align="center" mb={4}>
           <HStack>
             <Heading size="lg" mb={0}>Planificador semanal</Heading>
+            <Tooltip label="Aquí puedes crear y personalizar tu paleta de colores para clasificar tus tareas por grupos o importancia." fontSize="sm" hasArrow>
+              <span style={{ cursor: "pointer", marginLeft: 6 }}>
+                <HelpOutlineIcon fontSize="small" style={{ borderRadius: "50%", background: "#eee", color: "#555" }} />
+              </span>
+            </Tooltip>
             <IconButton
               aria-label="Editar paleta de colores"
               icon={<PaletteIcon />}
@@ -277,6 +343,12 @@ const Home = () => {
               <MenuItem icon={<PersonIcon />} onClick={perfilModal.onOpen}>
                 Perfil Usuario
               </MenuItem>
+              <MenuItem icon={<PaletteIcon />} onClick={paletaModal.onOpen}>
+                Paleta de colores
+              </MenuItem>
+              <MenuItem icon={<SettingsIcon />} onClick={colaboracionModal.onOpen}>
+                Colaboración semanal
+              </MenuItem>
               <MenuItem icon={<LogoutIcon />} onClick={handleCerrarSesion}>
                 Cerrar sesión
               </MenuItem>
@@ -294,6 +366,125 @@ const Home = () => {
             </MenuList>
           </Menu>
         </HStack>
+
+        {/* Modal de colaboración */}
+      <Modal isOpen={colaboracionModal.isOpen} onClose={colaboracionModal.onClose}>
+  <ModalOverlay />
+  <ModalContent>
+    <ModalHeader>Colaboración semanal</ModalHeader>
+    <ModalCloseButton />
+    <ModalBody>
+      {/* Calendario visual para elegir la semana */}
+      <VStack mb={4} spacing={3}>
+        <Text fontWeight="bold">Selecciona la semana a colaborar:</Text>
+        <Calendar
+          onChange={(value) => {
+            if (value && !Array.isArray(value)) {
+              setFechaSeleccionada(value);
+            }
+          }}
+          value={fechaSeleccionada}
+          view="month"
+          calendarType="iso8601"
+          showNeighboringMonth={false}
+        />
+        <Text fontSize="sm" color="gray.600" mt={2}>
+          Selecciona cualquier día y el planificador mostrará la semana correspondiente.
+        </Text>
+      </VStack>
+      {/* Confirmación de semana seleccionada */}
+      <Box mb={3} p={2} bg="teal.50" borderRadius="md" border="1px solid #b2f5ea">
+        <Text fontWeight="bold" color="teal.700">
+          Estás colaborando en la semana del{" "}
+          <b>
+            {diasSemana[0].toLocaleDateString()} al {diasSemana[6].toLocaleDateString()}
+          </b>
+        </Text>
+      </Box>
+      {/* Colaboración */}
+      {!semanaColaborativa ? (
+        <VStack mb={4}>
+          <Button colorScheme="teal" width="100%" onClick={async () => {
+            const codigo = nanoid(6).toUpperCase();
+            const ref = doc(db, "semanas", `${codigo}_${semanaClave}`);
+            await setDoc(ref, {
+              codigo,
+              semanaClave,
+              usuarios: [userEmail],
+              tareas: {},
+              objetivos: {},
+              notas: {}
+            });
+            setSemanaColaborativa(`${codigo}_${semanaClave}`);
+            setMensaje(`Semana creada. Código: ${codigo}`);
+            setTimeout(() => setMensaje(""), 3000);
+          }}>
+            Crear semana colaborativa
+          </Button>
+          <Input
+            placeholder="Código de semana"
+            value={codigoInput}
+            onChange={e => setCodigoInput(e.target.value.toUpperCase())}
+            width="100%"
+            mt={1}
+          />
+          <Button colorScheme="blue" width="100%" onClick={async () => {
+            const ref = doc(db, "semanas", `${codigoInput}_${semanaClave}`);
+            const snap = await getDoc(ref);
+            if (snap.exists()) {
+              const data = snap.data();
+              if (!data.usuarios.includes(userEmail)) {
+                await setDoc(ref, {
+                  ...data,
+                  usuarios: [...data.usuarios, userEmail]
+                });
+              }
+              setSemanaColaborativa(`${codigoInput}_${semanaClave}`);
+              setMensaje(`Unido a la semana: ${codigoInput}`);
+              setTimeout(() => setMensaje(""), 3000);
+            } else {
+              alert("Código o semana no válidos. Asegúrate de que ambos seleccionaron la misma semana.");
+            }
+          }}>
+            Unirse con código
+          </Button>
+          <Text fontSize="sm" color="gray.600" mt={2}>
+            Crea una semana colaborativa y comparte el código con tu pareja o amigos.<br />
+            O únete a una semana usando el código y la semana que te compartan.<br />
+            <b>Solo podrán colaborar en la semana seleccionada.</b>
+          </Text>
+        </VStack>
+      ) : (
+        <Box>
+          <Text>
+            Semana colaborativa: <b>{semanaColaborativa.split("_")[0]}</b> <br />
+            (semana del <b>{diasSemana[0].toLocaleDateString()} al {diasSemana[6].toLocaleDateString()}</b>)
+          </Text>
+          <Text fontSize="sm" color="teal.700" mt={2}>
+            Todos los cambios se sincronizan en tiempo real entre los participantes.
+          </Text>
+          <Button
+            mt={4}
+            colorScheme="yellow"
+            width="100%"
+            onClick={() => {
+              if (window.confirm("¿Deseas colaborar en otra semana? Guarda el código de esta semana antes de continuar.")) {
+                setSemanaColaborativa(null);
+                setCodigoInput("");
+                setMensaje("");
+              }
+            }}
+          >
+            Colaborar en otra semana
+          </Button>
+        </Box>
+      )}
+      {mensaje && (
+        <Text color="green.500" mt={2}>{mensaje}</Text>
+      )}
+    </ModalBody>
+  </ModalContent>
+</Modal>
 
         {/* Modal para personalizar paleta */}
         <Modal isOpen={paletaModal.isOpen} onClose={paletaModal.onClose}>
@@ -378,6 +569,51 @@ const Home = () => {
             </ModalBody>
           </ModalContent>
         </Modal>
+       {/*Modal de asignación de recordatorio*/}
+        <Modal isOpen={alarmaModal.abierto} onClose={cerrarModalAlarma}>
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>Asignar recordatorio</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              <Text>
+                Asigna una hora para la tarea: <b>{alarmaModal.tarea?.texto}</b>
+              </Text>
+              <VStack spacing={4} mt={4}>
+                <Text>Selecciona la hora para el recordatorio:</Text>
+                <Select
+                  placeholder="Selecciona la hora"
+                  value={alarmaModal.hora || ""}
+                  onChange={e =>
+                    setAlarmaModal(modal => ({
+                      ...modal,
+                      hora: e.target.value
+                    }))
+                  }
+                >
+                  {horasDelDia.map(hora => (
+                    <option key={hora} value={hora}>{hora}</option>
+                  ))}
+                </Select>
+                <Button colorScheme="teal" onClick={() => {
+                  if (alarmaModal.dia && typeof alarmaModal.hora === "string" && alarmaModal.tarea) {
+                    setTareas(prev => ({
+                      ...prev,
+                      [alarmaModal.dia!]: prev[alarmaModal.dia!].map(t =>
+                        t.texto === alarmaModal.tarea?.texto && t.fecha === alarmaModal.tarea?.fecha
+                          ? { ...t, hora: alarmaModal.hora }
+                          : t
+                      )
+                    }));
+                  }
+                  cerrarModalAlarma();
+                }}>
+                  Guardar recordatorio
+                </Button>
+              </VStack>
+            </ModalBody>
+          </ModalContent>
+        </Modal>
         {/* Modal de perfil editable */}
         <Modal isOpen={perfilModal.isOpen} onClose={perfilModal.onClose}>
           <ModalOverlay />
@@ -441,7 +677,13 @@ const Home = () => {
               </Box>
             </Box>
             <Box>
-              <Text fontWeight="bold" mb={1}>Objetivos</Text>
+              <Text fontWeight="bold" mb={1}>Objetivos
+                  <Tooltip label="Los objetivos son semanales. Al cambiar de semana, los objetivos también cambian." fontSize="sm" hasArrow>
+    <span style={{ cursor: "pointer", marginLeft: 6 }}>
+      <HelpOutlineIcon fontSize="small" style={{ borderRadius: "50%", background: "#eee", color: "#555" }} />
+    </span>
+  </Tooltip>
+              </Text>
               <VStack align="stretch" spacing={1}>
                 {(objetivos[semanaClave] || ["", "", ""]).map((obj, i) => (
                   <Input
@@ -459,7 +701,14 @@ const Home = () => {
               </VStack>
             </Box>
             <Box>
-              <Text fontWeight="bold" mb={1}>A tener en cuenta</Text>
+              <Text fontWeight="bold" mb={1}>A tener en cuenta
+                 <Tooltip label="Aquí puedes escribir detalles personales o recordatorios importantes para la semana. Es completamente personal." fontSize="sm" hasArrow>
+    <span style={{ cursor: "pointer", marginLeft: 6 }}>
+      <HelpOutlineIcon fontSize="small" style={{ borderRadius: "50%", background: "#eee", color: "#555" }} />
+    </span>
+  </Tooltip>
+              </Text>
+
               <Textarea
                 value={notas[semanaClave] || ""}
                 onChange={e => handleNotaChange(e.target.value)}
@@ -509,6 +758,16 @@ const Home = () => {
                       );
                       return (
                         <ListItem key={i} display="flex" alignItems="center">
+                          <Button
+                            size="xs"
+                            colorScheme="red"
+                            variant="ghost"
+                            ml={1}
+                            onClick={() => abrirModalAlarma(dia, tarea)}
+                            title="Asignar recordatorio"
+                          >
+                            <AlarmIcon fontSize="small" />
+                          </Button>
                           <input
                             type="checkbox"
                             checked={tarea.completada || false}
@@ -536,6 +795,11 @@ const Home = () => {
                             }}
                           >
                             {tarea.texto}
+                            {tarea.hora && (
+                              <Box as="span" color="teal.600" fontWeight="bold" ml={2} fontSize="sm">
+                                ⏰ {tarea.hora}
+                              </Box>
+                            )}
                           </Text>
                           <Button
                             size="xs"
@@ -612,6 +876,16 @@ const Home = () => {
                       );
                       return (
                         <ListItem key={i} display="flex" alignItems="center">
+                          <Button
+                            size="xs"
+                            colorScheme="red"
+                            variant="ghost"
+                            ml={1}
+                            onClick={() => abrirModalAlarma(dia, tarea)}
+                            title="Asignar recordatorio"
+                          >
+                            <AlarmIcon fontSize="small" />
+                          </Button>
                           <input
                             type="checkbox"
                             checked={tarea.completada || false}
@@ -639,6 +913,11 @@ const Home = () => {
                             }}
                           >
                             {tarea.texto}
+                            {tarea.hora && (
+                              <Box as="span" color="teal.600" fontWeight="bold" ml={2} fontSize="sm">
+                                ⏰ {tarea.hora}
+                              </Box>
+                            )}
                           </Text>
                           <Button
                             size="xs"
