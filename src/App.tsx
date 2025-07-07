@@ -17,7 +17,7 @@ const App: React.FC = () => {
     <>
       {/* Opcional: prueba que carga */}
       <div style={{ position: "fixed", top: 0, right: 0, padding: 4, color: "#888" }}>
-        v1.0 – Si ves esto, App se está montando
+        v1.0 – 
       </div>
 
       <Routes>

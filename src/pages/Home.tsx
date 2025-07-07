@@ -19,24 +19,11 @@ import StoreMallDirectoryIcon from '@mui/icons-material/StoreMallDirectory';
 import PersonIcon from '@mui/icons-material/Person';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PaletteIcon from '@mui/icons-material/Palette';
-import AlarmIcon from '@mui/icons-material/Alarm';
 import { nanoid } from "nanoid";
-
-const dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-
-interface Tarea {
-  texto: string;
-  fecha: string; // formato ISO
-  completada?: boolean;
-  color?: string;
-  hora?: string;
-}
-
-const horasDelDia = Array.from({ length: 36 }, (_, i) => {
-  const h = Math.floor(i / 2) + 6; // desde las 6:00
-  const m = i % 2 === 0 ? "00" : "30";
-  return `${h.toString().padStart(2, "0")}:${m}`;
-});
+import { dias, Tarea, horasDelDia } from "../utils/planificador";
+import TareaItem from "../components/Tarea";
+import AlarmIcon from '@mui/icons-material/Alarm';
+import Collaborate from "../components/Collaborate"; // <--- Importa tu componente aquí
 
 const Home = () => {
   // --- ESTADOS ---
@@ -83,21 +70,22 @@ const Home = () => {
   // --- FUNCIONES COLABORATIVAS ---
   const crearSemanaColaborativa = async () => {
     const codigo = nanoid(6).toUpperCase();
-    const ref = doc(db, "semanas", codigo);
+    const ref = doc(db, "semanas", `${codigo}_${semanaClave}`);
     await setDoc(ref, {
       codigo,
+      semanaClave,
       usuarios: [userEmail],
       tareas: {},
       objetivos: {},
       notas: {}
     });
-    setSemanaColaborativa(codigo);
+    setSemanaColaborativa(`${codigo}_${semanaClave}`);
     setMensaje(`Semana creada. Código: ${codigo}`);
     setTimeout(() => setMensaje(""), 3000);
   };
 
   const unirseASemana = async () => {
-    const ref = doc(db, "semanas", codigoInput);
+    const ref = doc(db, "semanas", `${codigoInput}_${semanaClave}`);
     const snap = await getDoc(ref);
     if (snap.exists()) {
       const data = snap.data();
@@ -107,11 +95,11 @@ const Home = () => {
           usuarios: [...data.usuarios, userEmail]
         });
       }
-      setSemanaColaborativa(codigoInput);
+      setSemanaColaborativa(`${codigoInput}_${semanaClave}`);
       setMensaje(`Unido a la semana: ${codigoInput}`);
       setTimeout(() => setMensaje(""), 3000);
     } else {
-      alert("Código no válido");
+      alert("Código o semana no válidos. Asegúrate de que ambos seleccionaron la misma semana.");
     }
   };
 
@@ -368,123 +356,59 @@ const Home = () => {
         </HStack>
 
         {/* Modal de colaboración */}
-      <Modal isOpen={colaboracionModal.isOpen} onClose={colaboracionModal.onClose}>
-  <ModalOverlay />
-  <ModalContent>
-    <ModalHeader>Colaboración semanal</ModalHeader>
-    <ModalCloseButton />
-    <ModalBody>
-      {/* Calendario visual para elegir la semana */}
-      <VStack mb={4} spacing={3}>
-        <Text fontWeight="bold">Selecciona la semana a colaborar:</Text>
-        <Calendar
-          onChange={(value) => {
-            if (value && !Array.isArray(value)) {
-              setFechaSeleccionada(value);
-            }
-          }}
-          value={fechaSeleccionada}
-          view="month"
-          calendarType="iso8601"
-          showNeighboringMonth={false}
-        />
-        <Text fontSize="sm" color="gray.600" mt={2}>
-          Selecciona cualquier día y el planificador mostrará la semana correspondiente.
-        </Text>
-      </VStack>
-      {/* Confirmación de semana seleccionada */}
-      <Box mb={3} p={2} bg="teal.50" borderRadius="md" border="1px solid #b2f5ea">
-        <Text fontWeight="bold" color="teal.700">
-          Estás colaborando en la semana del{" "}
-          <b>
-            {diasSemana[0].toLocaleDateString()} al {diasSemana[6].toLocaleDateString()}
-          </b>
-        </Text>
-      </Box>
-      {/* Colaboración */}
-      {!semanaColaborativa ? (
-        <VStack mb={4}>
-          <Button colorScheme="teal" width="100%" onClick={async () => {
-            const codigo = nanoid(6).toUpperCase();
-            const ref = doc(db, "semanas", `${codigo}_${semanaClave}`);
-            await setDoc(ref, {
-              codigo,
-              semanaClave,
-              usuarios: [userEmail],
-              tareas: {},
-              objetivos: {},
-              notas: {}
-            });
-            setSemanaColaborativa(`${codigo}_${semanaClave}`);
-            setMensaje(`Semana creada. Código: ${codigo}`);
-            setTimeout(() => setMensaje(""), 3000);
-          }}>
-            Crear semana colaborativa
-          </Button>
-          <Input
-            placeholder="Código de semana"
-            value={codigoInput}
-            onChange={e => setCodigoInput(e.target.value.toUpperCase())}
-            width="100%"
-            mt={1}
-          />
-          <Button colorScheme="blue" width="100%" onClick={async () => {
-            const ref = doc(db, "semanas", `${codigoInput}_${semanaClave}`);
-            const snap = await getDoc(ref);
-            if (snap.exists()) {
-              const data = snap.data();
-              if (!data.usuarios.includes(userEmail)) {
-                await setDoc(ref, {
-                  ...data,
-                  usuarios: [...data.usuarios, userEmail]
-                });
-              }
-              setSemanaColaborativa(`${codigoInput}_${semanaClave}`);
-              setMensaje(`Unido a la semana: ${codigoInput}`);
-              setTimeout(() => setMensaje(""), 3000);
-            } else {
-              alert("Código o semana no válidos. Asegúrate de que ambos seleccionaron la misma semana.");
-            }
-          }}>
-            Unirse con código
-          </Button>
-          <Text fontSize="sm" color="gray.600" mt={2}>
-            Crea una semana colaborativa y comparte el código con tu pareja o amigos.<br />
-            O únete a una semana usando el código y la semana que te compartan.<br />
-            <b>Solo podrán colaborar en la semana seleccionada.</b>
-          </Text>
-        </VStack>
-      ) : (
-        <Box>
-          <Text>
-            Semana colaborativa: <b>{semanaColaborativa.split("_")[0]}</b> <br />
-            (semana del <b>{diasSemana[0].toLocaleDateString()} al {diasSemana[6].toLocaleDateString()}</b>)
-          </Text>
-          <Text fontSize="sm" color="teal.700" mt={2}>
-            Todos los cambios se sincronizan en tiempo real entre los participantes.
-          </Text>
-          <Button
-            mt={4}
-            colorScheme="yellow"
-            width="100%"
-            onClick={() => {
-              if (window.confirm("¿Deseas colaborar en otra semana? Guarda el código de esta semana antes de continuar.")) {
-                setSemanaColaborativa(null);
-                setCodigoInput("");
-                setMensaje("");
-              }
-            }}
-          >
-            Colaborar en otra semana
-          </Button>
-        </Box>
-      )}
-      {mensaje && (
-        <Text color="green.500" mt={2}>{mensaje}</Text>
-      )}
-    </ModalBody>
-  </ModalContent>
-</Modal>
+        <Modal isOpen={colaboracionModal.isOpen} onClose={colaboracionModal.onClose}>
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>Colaboración semanal</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              {/* Calendario visual para elegir la semana */}
+              <VStack mb={4} spacing={3}>
+                <Text fontWeight="bold">Selecciona la semana a colaborar:</Text>
+                <Calendar
+                  onChange={(value) => {
+                    if (value && !Array.isArray(value)) {
+                      setFechaSeleccionada(value);
+                    }
+                  }}
+                  value={fechaSeleccionada}
+                  view="month"
+                  calendarType="iso8601"
+                  showNeighboringMonth={false}
+                />
+                <Text fontSize="sm" color="gray.600" mt={2}>
+                  Selecciona cualquier día y el planificador mostrará la semana correspondiente.
+                </Text>
+              </VStack>
+              {/* Confirmación de semana seleccionada */}
+              <Box mb={3} p={2} bg="teal.50" borderRadius="md" border="1px solid #b2f5ea">
+                <Text fontWeight="bold" color="teal.700">
+                  Estás colaborando en la semana del{" "}
+                  <b>
+                    {diasSemana[0].toLocaleDateString()} al {diasSemana[6].toLocaleDateString()}
+                  </b>
+                </Text>
+              </Box>
+              {/* Colaboración (ahora componente separado) */}
+              <Collaborate
+                semanaColaborativa={semanaColaborativa}
+                setSemanaColaborativa={setSemanaColaborativa}
+                codigoInput={codigoInput}
+                setCodigoInput={setCodigoInput}
+                mensaje={mensaje}
+                setMensaje={setMensaje}
+                diasSemana={diasSemana}
+                semanaClave={semanaClave}
+                userEmail={userEmail}
+                nanoid={nanoid}
+                db={db}
+                doc={doc}
+                setDoc={setDoc}
+                getDoc={getDoc}
+              />
+            </ModalBody>
+          </ModalContent>
+        </Modal>
 
         {/* Modal para personalizar paleta */}
         <Modal isOpen={paletaModal.isOpen} onClose={paletaModal.onClose}>
@@ -678,7 +602,8 @@ const Home = () => {
             </Box>
             <Box>
               <Text fontWeight="bold" mb={1}>Objetivos
-                  <Tooltip label="Los objetivos son semanales. Al cambiar de semana, los objetivos también cambian." fontSize="sm" hasArrow>
+                  <Tooltip label="Los objetivos son semanales. Al cambiar de semana, 
+                  los objetivos también cambian." fontSize="sm" hasArrow>
     <span style={{ cursor: "pointer", marginLeft: 6 }}>
       <HelpOutlineIcon fontSize="small" style={{ borderRadius: "50%", background: "#eee", color: "#555" }} />
     </span>
@@ -702,7 +627,10 @@ const Home = () => {
             </Box>
             <Box>
               <Text fontWeight="bold" mb={1}>A tener en cuenta
-                 <Tooltip label="Aquí puedes escribir detalles personales o recordatorios importantes para la semana. Es completamente personal." fontSize="sm" hasArrow>
+                 <Tooltip label="Aquí puedes escribir detalles personales o 
+                 recordatorios importantes para la semana. Es completamente personal." 
+                 fontSize="sm" 
+                 hasArrow>
     <span style={{ cursor: "pointer", marginLeft: 6 }}>
       <HelpOutlineIcon fontSize="small" style={{ borderRadius: "50%", background: "#eee", color: "#555" }} />
     </span>
@@ -757,56 +685,14 @@ const Home = () => {
                         t => t.texto === tarea.texto && t.fecha === tarea.fecha
                       );
                       return (
-                        <ListItem key={i} display="flex" alignItems="center">
-                          <Button
-                            size="xs"
-                            colorScheme="red"
-                            variant="ghost"
-                            ml={1}
-                            onClick={() => abrirModalAlarma(dia, tarea)}
-                            title="Asignar recordatorio"
-                          >
-                            <AlarmIcon fontSize="small" />
-                          </Button>
-                          <input
-                            type="checkbox"
-                            checked={tarea.completada || false}
-                            onChange={() => toggleTareaCompletada(dia, idxReal)}
-                            style={{ marginRight: 8 }}
-                          />
-                          <Box
-                            w="16px"
-                            h="16px"
-                            borderRadius="4px"
-                            bg={tarea.color || "#bdbdbd"}
-                            border="1px solid #888"
-                            mr={2}
-                          />
-                          <Text
-                            flex="1"
-                            color={tarea.completada ? "gray.400" : "#222"}
-                            textDecoration={tarea.completada ? "line-through" : "none"}
-                            style={{
-                              fontFamily: "'Permanent Marker', cursive",
-                              fontSize: "1.1em",
-                              letterSpacing: "0.5px",
-                              transform: "rotate(-1deg)",
-                              lineHeight: 1.3,
-                            }}
-                          >
-                            {tarea.texto}
-                            {tarea.hora && (
-                              <Box as="span" color="teal.600" fontWeight="bold" ml={2} fontSize="sm">
-                                ⏰ {tarea.hora}
-                              </Box>
-                            )}
-                          </Text>
-                          <Button
-                            size="xs"
-                            colorScheme="red"
-                            ml={2}
-                            onClick={() => eliminarTarea(dia, idxReal)}
-                          >×</Button>
+                        <ListItem key={i} >
+                        <TareaItem
+          tarea={tarea}
+          onToggle={() => toggleTareaCompletada(dia, idxReal)}
+          onDelete={() => eliminarTarea(dia, idxReal)}
+          onAlarma={() => abrirModalAlarma(dia, tarea)}
+        />
+
                         </ListItem>
                       );
                     })}
@@ -875,56 +761,13 @@ const Home = () => {
                         t => t.texto === tarea.texto && t.fecha === tarea.fecha
                       );
                       return (
-                        <ListItem key={i} display="flex" alignItems="center">
-                          <Button
-                            size="xs"
-                            colorScheme="red"
-                            variant="ghost"
-                            ml={1}
-                            onClick={() => abrirModalAlarma(dia, tarea)}
-                            title="Asignar recordatorio"
-                          >
-                            <AlarmIcon fontSize="small" />
-                          </Button>
-                          <input
-                            type="checkbox"
-                            checked={tarea.completada || false}
-                            onChange={() => toggleTareaCompletada(dia, idxReal)}
-                            style={{ marginRight: 8 }}
-                          />
-                          <Box
-                            w="16px"
-                            h="16px"
-                            borderRadius="4px"
-                            bg={tarea.color || "#bdbdbd"}
-                            border="1px solid #888"
-                            mr={2}
-                          />
-                          <Text
-                            flex="1"
-                            color={tarea.completada ? "gray.400" : "#222"}
-                            textDecoration={tarea.completada ? "line-through" : "none"}
-                            style={{
-                              fontFamily: "'Permanent Marker', cursive",
-                              fontSize: "1.1em",
-                              letterSpacing: "0.5px",
-                              transform: "rotate(-1deg)",
-                              lineHeight: 1.3,
-                            }}
-                          >
-                            {tarea.texto}
-                            {tarea.hora && (
-                              <Box as="span" color="teal.600" fontWeight="bold" ml={2} fontSize="sm">
-                                ⏰ {tarea.hora}
-                              </Box>
-                            )}
-                          </Text>
-                          <Button
-                            size="xs"
-                            colorScheme="red"
-                            ml={2}
-                            onClick={() => eliminarTarea(dia, idxReal)}
-                          >×</Button>
+                        <ListItem key={i} >
+                        <TareaItem
+          tarea={tarea}
+          onToggle={() => toggleTareaCompletada(dia, idxReal)}
+          onDelete={() => eliminarTarea(dia, idxReal)}
+          onAlarma={() => abrirModalAlarma(dia, tarea)}
+        />
                         </ListItem>
                       );
                     })}
