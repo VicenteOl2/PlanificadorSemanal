@@ -43,11 +43,17 @@ export function usePresenciaColaborativa({
     return () => unsubscribe();
   }, [semanaColaborativa, db]);
 
-  const setPresencia = (dia: string, value: string) => {
+ const setPresencia = async (dia: string, value: string) => {
     if (semanaColaborativa && userEmail) {
       const ref = doc(db, "semanas", semanaColaborativa);
-      setDoc(ref, {
+      const snap = await getDoc(ref);
+      let escribiendoActual = {};
+      if (snap.exists()) {
+        escribiendoActual = snap.data().escribiendo || {};
+      }
+      await setDoc(ref, {
         escribiendo: {
+          ...escribiendoActual,
           [userEmail]: value ? { dia, texto: value } : null
         }
       }, { merge: true });

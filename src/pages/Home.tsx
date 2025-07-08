@@ -112,15 +112,22 @@ const Home = () => {
   const semanaClave = diasSemana[0].toISOString().slice(0, 10);
 
   // --- CARGAR DATOS DE FIRESTORE EN TIEMPO REAL ---
-  useEffect(() => {
-    if (!userEmail && !semanaColaborativa) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    const ref = semanaColaborativa
-      ? doc(db, "semanas", semanaColaborativa)
-      : doc(db, "planes", userEmail!);
+useEffect(() => {
+  if (!userEmail && !semanaColaborativa) {
+    setLoading(false);
+    return;
+  }
+  setLoading(true);
+
+  const ref = semanaColaborativa
+    ? doc(db, "semanas", semanaColaborativa)
+    : doc(db, "planes", userEmail!);
+
+  // Solución: función async interna
+  const guardarDatos = async () => {
+    await setDoc(ref, { tareas, objetivos, notas }, { merge: true });
+  };
+  guardarDatos();
 
     // Sincronización en tiempo real
     const unsubscribe = onSnapshot(ref, (snap) => {
@@ -170,10 +177,10 @@ const Home = () => {
   };
 
   // --- MANEJO DE TAREAS ---
-  const handleInputChange = (dia: string, value: string) => {
-    setNuevaTarea({ ...nuevaTarea, [dia]: value });
-    setPresencia(dia, value); // Actualiza presencia en tiempo real
-  };
+const handleInputChange = (dia: string, value: string) => {
+  setNuevaTarea({ ...nuevaTarea, [dia]: value });
+  setPresencia(dia, value); // <-- puede ser async, pero no necesitas await aquí
+};
 
   const handleInputBlur = (dia: string) => {
     setPresencia(dia, ""); // Limpia presencia al salir del input
