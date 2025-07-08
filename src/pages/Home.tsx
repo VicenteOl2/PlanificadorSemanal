@@ -47,7 +47,10 @@ const Home = () => {
     { nombre: "Salud", color: "#43a047" },
   ]);
   const [semanaSeleccionadaInput, setSemanaSeleccionadaInput] = useState("");
-  const [semanaColaborativa, setSemanaColaborativa] = useState<string | null>(null);
+  const [semanaColaborativa, setSemanaColaborativa] = useState<string | null>(
+  localStorage.getItem("semanaColaborativa")
+);
+
   const [codigoInput, setCodigoInput] = useState(""); // Para unirse a una semana
   const [nuevoColor, setNuevoColor] = useState("#e53935");
   const [nuevoNombre, setNuevoNombre] = useState("");
@@ -74,6 +77,16 @@ const Home = () => {
   const cerrarModalAlarma = () => {
     setAlarmaModal({ abierto: false });
   };
+
+  
+// Sincroniza semanaColaborativa con localStorage
+useEffect(() => {
+  if (semanaColaborativa) {
+    localStorage.setItem("semanaColaborativa", semanaColaborativa);
+  } else {
+    localStorage.removeItem("semanaColaborativa");
+  }
+}, [semanaColaborativa]);
 
   // --- EFECTOS ---
   useEffect(() => {
@@ -142,14 +155,22 @@ useEffect(() => {
 
 
   // --- GUARDAR EN FIRESTORE ---
-  const handleGuardar = async () => {
-    const ref = semanaColaborativa
-      ? doc(db, "semanas", semanaColaborativa)
-      : doc(db, "planes", userEmail!);
+const handleGuardar = async () => {
+  const ref = semanaColaborativa
+    ? doc(db, "semanas", semanaColaborativa)
+    : doc(db, "planes", userEmail!);
+  try {
     await setDoc(ref, { tareas, objetivos, notas }, { merge: true });
     setMensaje("¡Planificador guardado en la nube!");
     setTimeout(() => setMensaje(""), 2000);
-  };
+    console.log("Guardado exitoso en Firestore:", { tareas, objetivos, notas });
+  } catch (error) {
+    setMensaje("Error al guardar en la nube. Revisa la consola.");
+    setTimeout(() => setMensaje(""), 4000);
+    console.error("Error al guardar en Firestore:", error);
+    alert("Error al guardar en Firestore: " + (error as any)?.message);
+  }
+};
 
   // --- GUARDAR PERFIL ---
   const handleGuardarPerfil = async () => {
