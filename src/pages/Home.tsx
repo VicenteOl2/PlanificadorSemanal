@@ -123,29 +123,23 @@ useEffect(() => {
     ? doc(db, "semanas", semanaColaborativa)
     : doc(db, "planes", userEmail!);
 
-  // Solución: función async interna
-  const guardarDatos = async () => {
-    await setDoc(ref, { tareas, objetivos, notas }, { merge: true });
-  };
-  guardarDatos();
+  const unsubscribe = onSnapshot(ref, (snap) => {
+    if (snap.exists()) {
+      const data = snap.data();
+      setTareas(data.tareas || {});
+      setObjetivos(data.objetivos || {});
+      setNotas(data.notas || {});
+    } else {
+      setTareas({});
+      setObjetivos({});
+      setNotas({});
+    }
+    setLoading(false);
+  });
 
-    // Sincronización en tiempo real
-    const unsubscribe = onSnapshot(ref, (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        setTareas(data.tareas || {});
-        setObjetivos(data.objetivos || {});
-        setNotas(data.notas || {});
-      } else {
-        setTareas({});
-        setObjetivos({});
-        setNotas({});
-      }
-      setLoading(false);
-    });
+  return () => unsubscribe();
+}, [userEmail, semanaColaborativa]);
 
-    return () => unsubscribe();
-  }, [userEmail, semanaColaborativa]);
 
   // --- GUARDAR EN FIRESTORE ---
   const handleGuardar = async () => {
