@@ -23,7 +23,8 @@ import { nanoid } from "nanoid";
 import { dias, Tarea, horasDelDia } from "../utils/planificador";
 import TareaItem from "../components/Tarea";
 import AlarmIcon from '@mui/icons-material/Alarm';
-import Collaborate from "../components/Collaborate"; // <--- Importa tu componente aquí
+import Collaborate, { usePresenciaColaborativa } from "../components/Collaborate";
+import Alarm from "../components/Alarm";
 
 const Home = () => {
   // --- ESTADOS ---
@@ -53,6 +54,13 @@ const Home = () => {
   const [alarmaModal, setAlarmaModal] = useState<{ abierto: boolean; dia?: string; tarea?: Tarea; hora?: string }>({ abierto: false });
   const colaboracionModal = useDisclosure(); // <-- Modal de colaboración
 
+  // --- PRESENCIA EN TIEMPO REAL ---
+  const { escribiendo, setPresencia } = usePresenciaColaborativa({
+    semanaColaborativa,
+    userEmail,
+    db
+  });
+
   // --- MODALES ---
   const { isOpen, onOpen, onClose } = useDisclosure(); // Negocios
   const perfilModal = useDisclosure(); // Perfil
@@ -65,42 +73,6 @@ const Home = () => {
   };
   const cerrarModalAlarma = () => {
     setAlarmaModal({ abierto: false });
-  };
-
-  // --- FUNCIONES COLABORATIVAS ---
-  const crearSemanaColaborativa = async () => {
-    const codigo = nanoid(6).toUpperCase();
-    const ref = doc(db, "semanas", `${codigo}_${semanaClave}`);
-    await setDoc(ref, {
-      codigo,
-      semanaClave,
-      usuarios: [userEmail],
-      tareas: {},
-      objetivos: {},
-      notas: {}
-    });
-    setSemanaColaborativa(`${codigo}_${semanaClave}`);
-    setMensaje(`Semana creada. Código: ${codigo}`);
-    setTimeout(() => setMensaje(""), 3000);
-  };
-
-  const unirseASemana = async () => {
-    const ref = doc(db, "semanas", `${codigoInput}_${semanaClave}`);
-    const snap = await getDoc(ref);
-    if (snap.exists()) {
-      const data = snap.data();
-      if (!data.usuarios.includes(userEmail)) {
-        await setDoc(ref, {
-          ...data,
-          usuarios: [...data.usuarios, userEmail]
-        });
-      }
-      setSemanaColaborativa(`${codigoInput}_${semanaClave}`);
-      setMensaje(`Unido a la semana: ${codigoInput}`);
-      setTimeout(() => setMensaje(""), 3000);
-    } else {
-      alert("Código o semana no válidos. Asegúrate de que ambos seleccionaron la misma semana.");
-    }
   };
 
   // --- EFECTOS ---
@@ -198,8 +170,14 @@ const Home = () => {
   };
 
   // --- MANEJO DE TAREAS ---
-  const handleInputChange = (dia: string, value: string) =>
+  const handleInputChange = (dia: string, value: string) => {
     setNuevaTarea({ ...nuevaTarea, [dia]: value });
+    setPresencia(dia, value); // Actualiza presencia en tiempo real
+  };
+
+  const handleInputBlur = (dia: string) => {
+    setPresencia(dia, ""); // Limpia presencia al salir del input
+  };
 
   const agregarTarea = (dia: string, fechaDia: Date) => {
     if (!nuevaTarea[dia]) return;
@@ -214,6 +192,7 @@ const Home = () => {
       [dia]: [...(tareas[dia] || []), nueva],
     });
     setNuevaTarea({ ...nuevaTarea, [dia]: '' });
+    setPresencia(dia, ""); // Limpia presencia al agregar tarea
   };
 
   const toggleTareaCompletada = (dia: string, idx: number) => {
@@ -493,51 +472,14 @@ const Home = () => {
             </ModalBody>
           </ModalContent>
         </Modal>
-       {/*Modal de asignación de recordatorio*/}
-        <Modal isOpen={alarmaModal.abierto} onClose={cerrarModalAlarma}>
-          <ModalOverlay />
-          <ModalContent>
-            <ModalHeader>Asignar recordatorio</ModalHeader>
-            <ModalCloseButton />
-            <ModalBody>
-              <Text>
-                Asigna una hora para la tarea: <b>{alarmaModal.tarea?.texto}</b>
-              </Text>
-              <VStack spacing={4} mt={4}>
-                <Text>Selecciona la hora para el recordatorio:</Text>
-                <Select
-                  placeholder="Selecciona la hora"
-                  value={alarmaModal.hora || ""}
-                  onChange={e =>
-                    setAlarmaModal(modal => ({
-                      ...modal,
-                      hora: e.target.value
-                    }))
-                  }
-                >
-                  {horasDelDia.map(hora => (
-                    <option key={hora} value={hora}>{hora}</option>
-                  ))}
-                </Select>
-                <Button colorScheme="teal" onClick={() => {
-                  if (alarmaModal.dia && typeof alarmaModal.hora === "string" && alarmaModal.tarea) {
-                    setTareas(prev => ({
-                      ...prev,
-                      [alarmaModal.dia!]: prev[alarmaModal.dia!].map(t =>
-                        t.texto === alarmaModal.tarea?.texto && t.fecha === alarmaModal.tarea?.fecha
-                          ? { ...t, hora: alarmaModal.hora }
-                          : t
-                      )
-                    }));
-                  }
-                  cerrarModalAlarma();
-                }}>
-                  Guardar recordatorio
-                </Button>
-              </VStack>
-            </ModalBody>
-          </ModalContent>
-        </Modal>
+       <Alarm
+  isOpen={alarmaModal.abierto}
+  onClose={cerrarModalAlarma}
+  alarmaModal={alarmaModal}
+  setAlarmaModal={setAlarmaModal}
+  setTareas={setTareas}
+  horasDelDia={horasDelDia}
+        />
         {/* Modal de perfil editable */}
         <Modal isOpen={perfilModal.isOpen} onClose={perfilModal.onClose}>
           <ModalOverlay />
@@ -686,13 +628,12 @@ const Home = () => {
                       );
                       return (
                         <ListItem key={i} >
-                        <TareaItem
-          tarea={tarea}
-          onToggle={() => toggleTareaCompletada(dia, idxReal)}
-          onDelete={() => eliminarTarea(dia, idxReal)}
-          onAlarma={() => abrirModalAlarma(dia, tarea)}
-        />
-
+                          <TareaItem
+                            tarea={tarea}
+                            onToggle={() => toggleTareaCompletada(dia, idxReal)}
+                            onDelete={() => eliminarTarea(dia, idxReal)}
+                            onAlarma={() => abrirModalAlarma(dia, tarea)}
+                          />
                         </ListItem>
                       );
                     })}
@@ -703,6 +644,7 @@ const Home = () => {
                       placeholder="Nueva tarea"
                       value={nuevaTarea[dia] || ""}
                       onChange={e => handleInputChange(dia, e.target.value)}
+                      onBlur={() => handleInputBlur(dia)}
                       onKeyDown={e => { if (e.key === "Enter") agregarTarea(dia, diasSemana[idx]); }}
                       bg="white"
                       borderRadius="10px"
@@ -725,6 +667,14 @@ const Home = () => {
                       onClick={() => agregarTarea(dia, diasSemana[idx])}
                     >+</Button>
                   </HStack>
+                  {/* Presencia en tiempo real */}
+                  {Object.entries(escribiendo)
+                    .filter(([email, info]) => info && info.dia === dia && email !== userEmail)
+                    .map(([email]) => (
+                      <Text key={email} fontSize="xs" color="teal.500">
+                        {email.split("@")[0]} está escribiendo...
+                      </Text>
+                    ))}
                 </Box>
               ))}
             </SimpleGrid>
@@ -762,12 +712,12 @@ const Home = () => {
                       );
                       return (
                         <ListItem key={i} >
-                        <TareaItem
-          tarea={tarea}
-          onToggle={() => toggleTareaCompletada(dia, idxReal)}
-          onDelete={() => eliminarTarea(dia, idxReal)}
-          onAlarma={() => abrirModalAlarma(dia, tarea)}
-        />
+                          <TareaItem
+                            tarea={tarea}
+                            onToggle={() => toggleTareaCompletada(dia, idxReal)}
+                            onDelete={() => eliminarTarea(dia, idxReal)}
+                            onAlarma={() => abrirModalAlarma(dia, tarea)}
+                          />
                         </ListItem>
                       );
                     })}
@@ -778,6 +728,7 @@ const Home = () => {
                       placeholder="Nueva tarea"
                       value={nuevaTarea[dia] || ""}
                       onChange={e => handleInputChange(dia, e.target.value)}
+                      onBlur={() => handleInputBlur(dia)}
                       onKeyDown={e => { if (e.key === "Enter") agregarTarea(dia, diasSemana[idx + 3]); }}
                       bg="white"
                       borderRadius="10px"
@@ -800,6 +751,14 @@ const Home = () => {
                       onClick={() => agregarTarea(dia, diasSemana[idx + 3])}
                     >+</Button>
                   </HStack>
+                  {/* Presencia en tiempo real */}
+                  {Object.entries(escribiendo)
+                    .filter(([email, info]) => info && info.dia === dia && email !== userEmail)
+                    .map(([email]) => (
+                      <Text key={email} fontSize="xs" color="teal.500">
+                        {email.split("@")[0]} está escribiendo...
+                      </Text>
+                    ))}
                 </Box>
               ))}
             </SimpleGrid>

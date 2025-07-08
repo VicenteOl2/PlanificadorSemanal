@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { VStack, Button, Input, Text, Box, Select } from "@chakra-ui/react";
-import { DocumentReference, Firestore, setDoc, getDoc, doc } from "firebase/firestore";
+import { Firestore, setDoc, getDoc, doc, onSnapshot } from "firebase/firestore";
 
 interface CollaborateProps {
   semanaColaborativa: string | null;
@@ -17,6 +17,44 @@ interface CollaborateProps {
   doc: typeof doc;
   setDoc: typeof setDoc;
   getDoc: typeof getDoc;
+}
+
+// --- Custom hook para presencia colaborativa ---
+export function usePresenciaColaborativa({
+  semanaColaborativa,
+  userEmail,
+  db
+}: {
+  semanaColaborativa: string | null,
+  userEmail: string | null,
+  db: Firestore
+}) {
+  const [escribiendo, setEscribiendo] = useState<{ [email: string]: { dia: string; texto: string } | null }>({});
+
+  useEffect(() => {
+    if (!semanaColaborativa) return;
+    const ref = doc(db, "semanas", semanaColaborativa);
+    const unsubscribe = onSnapshot(ref, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setEscribiendo(data.escribiendo || {});
+      }
+    });
+    return () => unsubscribe();
+  }, [semanaColaborativa, db]);
+
+  const setPresencia = (dia: string, value: string) => {
+    if (semanaColaborativa && userEmail) {
+      const ref = doc(db, "semanas", semanaColaborativa);
+      setDoc(ref, {
+        escribiendo: {
+          [userEmail]: value ? { dia, texto: value } : null
+        }
+      }, { merge: true });
+    }
+  };
+
+  return { escribiendo, setPresencia };
 }
 
 const Collaborate: React.FC<CollaborateProps> = ({
