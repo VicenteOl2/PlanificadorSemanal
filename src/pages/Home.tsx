@@ -52,6 +52,7 @@ const Home = () => {
     localStorage.getItem("semanaColaborativa")
   );
    const [modoColaborativo, setModoColaborativo] = useState<boolean>(!!semanaColaborativa);
+   const [cargandoModo, setCargandoModo] = useState(false);
   const [codigoInput, setCodigoInput] = useState(""); // Para unirse a una semana
   const [nuevoColor, setNuevoColor] = useState("#e53935");
   const [nuevoNombre, setNuevoNombre] = useState("");
@@ -290,7 +291,18 @@ const Home = () => {
       </Box>
     );
   }
-
+if (cargandoModo || loading) {
+  return (
+    <Box minH="100vh" display="flex" alignItems="center" justifyContent="center">
+      <Spinner size="xl" color="teal.400" />
+      <Text ml={4}>
+        {semanaColaborativa
+          ? "Cargando planificador colaborativo..."
+          : "Cargando planificador personal..."}
+      </Text>
+    </Box>
+  );
+}
   // --- RETURN ---
   return (
     <Box minH="100vh" p={0} style={{
@@ -328,6 +340,7 @@ const Home = () => {
         }
       }
       setTimeout(() => setMensaje(""), 2000);
+      setTimeout(() => setCargandoModo(false), 800); // Simula carga breve
     }}
   >
     {semanaColaborativa ? "Ver mi planificador personal" : "Ver planificador colaborativo"}
