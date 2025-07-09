@@ -98,6 +98,8 @@ const Home = () => {
           nombre: user.displayName || "Usuario",
         }));
       } else {
+        localStorage.removeItem("semanaColaborativa");
+setSemanaColaborativa(null);
         setUserEmail(null);
         setPerfil(prev => ({ ...prev, email: "" }));
         navigate("/login");
@@ -208,36 +210,42 @@ const Home = () => {
   };
 
   const agregarTarea = (dia: string, fechaDia: Date) => {
-    if (!nuevaTarea[dia]) return;
-    const nueva: Tarea = {
-      texto: nuevaTarea[dia],
-      fecha: fechaDia.toISOString(),
-      completada: false,
-      color: colorTarea[dia] || paleta[0].color
-    };
-    setTareas({
-      ...tareas,
-      [dia]: [...(tareas[dia] || []), nueva],
-    });
-    setNuevaTarea({ ...nuevaTarea, [dia]: '' });
-    setPresencia(dia, ""); // Limpia presencia al agregar tarea
+  if (!nuevaTarea[dia]) return;
+  const nueva: Tarea = {
+    texto: nuevaTarea[dia],
+    fecha: fechaDia.toISOString(),
+    completada: false,
+    color: colorTarea[dia] || paleta[0].color
   };
+  const nuevasTareas = {
+    ...tareas,
+    [dia]: [...(tareas[dia] || []), nueva],
+  };
+  setTareas(nuevasTareas);
+  setNuevaTarea({ ...nuevaTarea, [dia]: '' });
+  setPresencia(dia, "");
+  handleGuardar(); // <-- GUARDA EN FIRESTORE
+};
 
   const toggleTareaCompletada = (dia: string, idx: number) => {
-    setTareas(prev => ({
-      ...prev,
-      [dia]: prev[dia].map((t, i) =>
-        i === idx ? { ...t, completada: !t.completada } : t
-      ),
-    }));
+  const nuevasTareas = {
+    ...tareas,
+    [dia]: tareas[dia].map((t, i) =>
+      i === idx ? { ...t, completada: !t.completada } : t
+    ),
   };
+  setTareas(nuevasTareas);
+  handleGuardar(); // <-- GUARDA EN FIRESTORE
+};
 
-  const eliminarTarea = (dia: string, index: number) => {
-    setTareas({
-      ...tareas,
-      [dia]: tareas[dia].filter((_, i) => i !== index),
-    });
+const eliminarTarea = (dia: string, index: number) => {
+  const nuevasTareas = {
+    ...tareas,
+    [dia]: tareas[dia].filter((_, i) => i !== index),
   };
+  setTareas(nuevasTareas);
+  handleGuardar(); // <-- GUARDA EN FIRESTORE
+};
 
   // --- MANEJO DE OBJETIVOS Y NOTAS ---
   const handleObjetivoChange = (idx: number, value: string) => {
@@ -263,10 +271,11 @@ const Home = () => {
 
   // --- CERRAR SESIÓN ---
   const handleCerrarSesion = async () => {
-    const auth = getAuth();
-    await signOut(auth);
-    window.location.href = "/login";
-  };
+  localStorage.removeItem("semanaColaborativa");
+  setSemanaColaborativa(null);
+  await signOut(auth);
+  window.location.href = "/login";
+};
 
   // --- LOADING ---
   if (loading) {
@@ -559,6 +568,10 @@ const Home = () => {
               <Box borderRadius="md" p={2} mb={4} bg="white">
                 <Calendar
                   onChange={(value) => {
+                    if (semanaColaborativa) {
+      alert("No puedes cambiar de semana mientras colaboras. Cancela la colaboración primero.");
+      return;
+    }
                     if (value && !Array.isArray(value)) {
                       setFechaSeleccionada(value);
                     }
