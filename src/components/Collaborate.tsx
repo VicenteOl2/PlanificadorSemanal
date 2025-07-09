@@ -112,8 +112,19 @@ const Collaborate: React.FC<CollaborateProps> = ({
     }
   }, [semanaColaborativa, db, doc, getDoc]);
 
+
+
   return (
     <>
+      {!userEmail ? (
+  <Text color="red.500" mb={2}>
+    No has iniciado sesión. Por favor, inicia sesión para colaborar.
+  </Text>
+) : (
+  <Text color="gray.600" mb={2}>
+    Sesión iniciada como: <b>{userEmail}</b>
+  </Text>
+)}
       {!semanaColaborativa ? (
         <VStack mb={4}>
           <Select

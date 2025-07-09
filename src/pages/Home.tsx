@@ -40,6 +40,7 @@ const Home = () => {
   const [loading, setLoading] = useState(true);
   const [user] = useAuthState(auth);
   const [colorTarea, setColorTarea] = useState<{ [dia: string]: string }>({});
+ 
   const [paleta, setPaleta] = useState([
     { nombre: "Importante", color: "#e53935" },
     { nombre: "Casa", color: "#1e88e5" },
@@ -50,6 +51,7 @@ const Home = () => {
   const [semanaColaborativa, setSemanaColaborativa] = useState<string | null>(
     localStorage.getItem("semanaColaborativa")
   );
+   const [modoColaborativo, setModoColaborativo] = useState<boolean>(!!semanaColaborativa);
   const [codigoInput, setCodigoInput] = useState(""); // Para unirse a una semana
   const [nuevoColor, setNuevoColor] = useState("#e53935");
   const [nuevoNombre, setNuevoNombre] = useState("");
@@ -303,8 +305,33 @@ const Home = () => {
       <Box maxW="1200px" mx="auto" mt={4} p={2} position="relative">
         {/* Barra superior con título y menú */}
         <HStack justify="space-between" align="center" mb={4}>
-          <HStack>
-            <Heading size="lg" mb={0}>Planificador semanal</Heading>
+            <HStack>
+  <Heading size="lg" mb={0}>
+    {semanaColaborativa ? "Planificador semanal colaborativo" : "Planificador semanal"}
+  </Heading>
+  <Button
+    size="sm"
+    colorScheme={semanaColaborativa ? "teal" : "gray"}
+    variant={semanaColaborativa ? "solid" : "outline"}
+    ml={4}
+    onClick={() => {
+      if (semanaColaborativa) {
+        setSemanaColaborativa(null);
+        setMensaje("Has vuelto a tu planificador personal.");
+      } else {
+        const colab = localStorage.getItem("semanaColaborativa");
+        if (colab) {
+          setSemanaColaborativa(colab);
+          setMensaje("Has cambiado al planificador colaborativo.");
+        } else {
+          setMensaje("No tienes colaboración activa. Únete o crea una desde el menú.");
+        }
+      }
+      setTimeout(() => setMensaje(""), 2000);
+    }}
+  >
+    {semanaColaborativa ? "Ver mi planificador personal" : "Ver planificador colaborativo"}
+  </Button>
             <Tooltip label="Aquí puedes crear y personalizar tu paleta de colores para clasificar tus tareas por grupos o importancia." fontSize="sm" hasArrow>
               <span style={{ cursor: "pointer", marginLeft: 6 }}>
                 <HelpOutlineIcon fontSize="small" style={{ borderRadius: "50%", background: "#eee", color: "#555" }} />
