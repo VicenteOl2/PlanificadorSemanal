@@ -99,7 +99,7 @@ const Home = () => {
         }));
       } else {
         localStorage.removeItem("semanaColaborativa");
-setSemanaColaborativa(null);
+        setSemanaColaborativa(null);
         setUserEmail(null);
         setPerfil(prev => ({ ...prev, email: "" }));
         navigate("/login");
@@ -126,13 +126,11 @@ setSemanaColaborativa(null);
 
   // --- CARGAR DATOS DE FIRESTORE EN TIEMPO REAL ---
   useEffect(() => {
-    // Espera a que userEmail esté definido (usuario autenticado) o haya colaboración
     if (!userEmail && !semanaColaborativa) {
       setLoading(false);
       return;
     }
     if (!userEmail && semanaColaborativa === null) {
-      // Espera a que userEmail se defina
       return;
     }
     setLoading(true);
@@ -171,7 +169,6 @@ setSemanaColaborativa(null);
       await setDoc(ref, { tareas, objetivos, notas }, { merge: true });
       setMensaje("¡Planificador guardado en la nube!");
       setTimeout(() => setMensaje(""), 2000);
-      console.log("Guardado exitoso en Firestore:", { tareas, objetivos, notas });
     } catch (error) {
       setMensaje("Error al guardar en la nube. Revisa la consola.");
       setTimeout(() => setMensaje(""), 4000);
@@ -179,6 +176,14 @@ setSemanaColaborativa(null);
       alert("Error al guardar en Firestore: " + (error as any)?.message);
     }
   };
+
+  // --- GUARDADO AUTOMÁTICO DE TAREAS ---
+  useEffect(() => {
+    if (tareas && Object.keys(tareas).length > 0) {
+      handleGuardar();
+    }
+    // eslint-disable-next-line
+  }, [tareas]);
 
   // --- GUARDAR PERFIL ---
   const handleGuardarPerfil = async () => {
@@ -202,50 +207,47 @@ setSemanaColaborativa(null);
   // --- MANEJO DE TAREAS ---
   const handleInputChange = (dia: string, value: string) => {
     setNuevaTarea({ ...nuevaTarea, [dia]: value });
-    setPresencia(dia, value); // <-- puede ser async, pero no necesitas await aquí
+    setPresencia(dia, value);
   };
 
   const handleInputBlur = (dia: string) => {
-    setPresencia(dia, ""); // Limpia presencia al salir del input
+    setPresencia(dia, "");
   };
 
   const agregarTarea = (dia: string, fechaDia: Date) => {
-  if (!nuevaTarea[dia]) return;
-  const nueva: Tarea = {
-    texto: nuevaTarea[dia],
-    fecha: fechaDia.toISOString(),
-    completada: false,
-    color: colorTarea[dia] || paleta[0].color
+    if (!nuevaTarea[dia]) return;
+    const nueva: Tarea = {
+      texto: nuevaTarea[dia],
+      fecha: fechaDia.toISOString(),
+      completada: false,
+      color: colorTarea[dia] || paleta[0].color
+    };
+    const nuevasTareas = {
+      ...tareas,
+      [dia]: [...(tareas[dia] || []), nueva],
+    };
+    setTareas(nuevasTareas);
+    setNuevaTarea({ ...nuevaTarea, [dia]: '' });
+    setPresencia(dia, "");
   };
-  const nuevasTareas = {
-    ...tareas,
-    [dia]: [...(tareas[dia] || []), nueva],
-  };
-  setTareas(nuevasTareas);
-  setNuevaTarea({ ...nuevaTarea, [dia]: '' });
-  setPresencia(dia, "");
-  handleGuardar(); // <-- GUARDA EN FIRESTORE
-};
 
   const toggleTareaCompletada = (dia: string, idx: number) => {
-  const nuevasTareas = {
-    ...tareas,
-    [dia]: tareas[dia].map((t, i) =>
-      i === idx ? { ...t, completada: !t.completada } : t
-    ),
+    const nuevasTareas = {
+      ...tareas,
+      [dia]: tareas[dia].map((t, i) =>
+        i === idx ? { ...t, completada: !t.completada } : t
+      ),
+    };
+    setTareas(nuevasTareas);
   };
-  setTareas(nuevasTareas);
-  handleGuardar(); // <-- GUARDA EN FIRESTORE
-};
 
-const eliminarTarea = (dia: string, index: number) => {
-  const nuevasTareas = {
-    ...tareas,
-    [dia]: tareas[dia].filter((_, i) => i !== index),
+  const eliminarTarea = (dia: string, index: number) => {
+    const nuevasTareas = {
+      ...tareas,
+      [dia]: tareas[dia].filter((_, i) => i !== index),
+    };
+    setTareas(nuevasTareas);
   };
-  setTareas(nuevasTareas);
-  handleGuardar(); // <-- GUARDA EN FIRESTORE
-};
 
   // --- MANEJO DE OBJETIVOS Y NOTAS ---
   const handleObjetivoChange = (idx: number, value: string) => {
@@ -271,11 +273,11 @@ const eliminarTarea = (dia: string, index: number) => {
 
   // --- CERRAR SESIÓN ---
   const handleCerrarSesion = async () => {
-  localStorage.removeItem("semanaColaborativa");
-  setSemanaColaborativa(null);
-  await signOut(auth);
-  window.location.href = "/login";
-};
+    localStorage.removeItem("semanaColaborativa");
+    setSemanaColaborativa(null);
+    await signOut(auth);
+    window.location.href = "/login";
+  };
 
   // --- LOADING ---
   if (loading) {
@@ -510,12 +512,12 @@ const eliminarTarea = (dia: string, index: number) => {
           </ModalContent>
         </Modal>
         <Alarm
-  isOpen={alarmaModal.abierto}
-  onClose={cerrarModalAlarma}
-  alarmaModal={alarmaModal}
-  setAlarmaModal={setAlarmaModal}
-  setTareas={setTareas}
-  horasDelDia={horasDelDia}
+          isOpen={alarmaModal.abierto}
+          onClose={cerrarModalAlarma}
+          alarmaModal={alarmaModal}
+          setAlarmaModal={setAlarmaModal}
+          setTareas={setTareas}
+          horasDelDia={horasDelDia}
         />
         {/* Modal de perfil editable */}
         <Modal isOpen={perfilModal.isOpen} onClose={perfilModal.onClose}>
@@ -569,9 +571,9 @@ const eliminarTarea = (dia: string, index: number) => {
                 <Calendar
                   onChange={(value) => {
                     if (semanaColaborativa) {
-      alert("No puedes cambiar de semana mientras colaboras. Cancela la colaboración primero.");
-      return;
-    }
+                      alert("No puedes cambiar de semana mientras colaboras. Cancela la colaboración primero.");
+                      return;
+                    }
                     if (value && !Array.isArray(value)) {
                       setFechaSeleccionada(value);
                     }
@@ -585,12 +587,12 @@ const eliminarTarea = (dia: string, index: number) => {
             </Box>
             <Box>
               <Text fontWeight="bold" mb={1}>Objetivos
-                  <Tooltip label="Los objetivos son semanales. Al cambiar de semana, 
+                <Tooltip label="Los objetivos son semanales. Al cambiar de semana, 
                   los objetivos también cambian." fontSize="sm" hasArrow>
-    <span style={{ cursor: "pointer", marginLeft: 6 }}>
-      <HelpOutlineIcon fontSize="small" style={{ borderRadius: "50%", background: "#eee", color: "#555" }} />
-    </span>
-  </Tooltip>
+                  <span style={{ cursor: "pointer", marginLeft: 6 }}>
+                    <HelpOutlineIcon fontSize="small" style={{ borderRadius: "50%", background: "#eee", color: "#555" }} />
+                  </span>
+                </Tooltip>
               </Text>
               <VStack align="stretch" spacing={1}>
                 {(objetivos[semanaClave] || ["", "", ""]).map((obj, i) => (
@@ -610,16 +612,15 @@ const eliminarTarea = (dia: string, index: number) => {
             </Box>
             <Box>
               <Text fontWeight="bold" mb={1}>A tener en cuenta
-                 <Tooltip label="Aquí puedes escribir detalles personales o 
+                <Tooltip label="Aquí puedes escribir detalles personales o 
                  recordatorios importantes para la semana. Es completamente personal." 
-                 fontSize="sm" 
-                 hasArrow>
-    <span style={{ cursor: "pointer", marginLeft: 6 }}>
-      <HelpOutlineIcon fontSize="small" style={{ borderRadius: "50%", background: "#eee", color: "#555" }} />
-    </span>
-  </Tooltip>
+                  fontSize="sm" 
+                  hasArrow>
+                  <span style={{ cursor: "pointer", marginLeft: 6 }}>
+                    <HelpOutlineIcon fontSize="small" style={{ borderRadius: "50%", background: "#eee", color: "#555" }} />
+                  </span>
+                </Tooltip>
               </Text>
-
               <Textarea
                 value={notas[semanaClave] || ""}
                 onChange={e => handleNotaChange(e.target.value)}
@@ -690,7 +691,6 @@ const eliminarTarea = (dia: string, index: number) => {
                       bg="white"
                       borderRadius="10px"
                     />
-                    {/* Selector de color dinámico */}
                     <select
                       style={{ width: 80, height: 32, borderRadius: 6, border: "1px solid #ccc" }}
                       value={colorTarea[dia] || paleta[0]?.color}
@@ -708,7 +708,6 @@ const eliminarTarea = (dia: string, index: number) => {
                       onClick={() => agregarTarea(dia, diasSemana[idx])}
                     >+</Button>
                   </HStack>
-                  {/* Presencia en tiempo real */}
                   {Object.entries(escribiendo)
                     .filter(([email, info]) => info && info.dia === dia && email !== userEmail)
                     .map(([email]) => (
@@ -774,7 +773,6 @@ const eliminarTarea = (dia: string, index: number) => {
                       bg="white"
                       borderRadius="10px"
                     />
-                    {/* Selector de color dinámico */}
                     <select
                       style={{ width: 80, height: 32, borderRadius: 6, border: "1px solid #ccc" }}
                       value={colorTarea[dia] || paleta[0]?.color}
@@ -792,7 +790,6 @@ const eliminarTarea = (dia: string, index: number) => {
                       onClick={() => agregarTarea(dia, diasSemana[idx + 3])}
                     >+</Button>
                   </HStack>
-                  {/* Presencia en tiempo real */}
                   {Object.entries(escribiendo)
                     .filter(([email, info]) => info && info.dia === dia && email !== userEmail)
                     .map(([email]) => (
