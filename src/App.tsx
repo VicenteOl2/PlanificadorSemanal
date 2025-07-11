@@ -11,7 +11,7 @@ import CalendarPage from "./pages/CalendarPage";
 import NegocioDetalle from "./components/NegocioDetalle";
 import ReservasNegocio from "./components/ReservasNegocio";
 import WeeklyPlanner from "./components/WeeklyPlanner";
-
+import CalendarioMensual from "./components/CalendarioMensual";
 const App: React.FC = () => {
   return (
     <>
@@ -35,6 +35,7 @@ const App: React.FC = () => {
           <Route path="/negocio/:id" element={<NegocioDetalle />} />
           <Route path="/negocio/:id/reservas" element={<ReservasNegocio />} />
           <Route path="/weekly-planner" element={<WeeklyPlanner />} />
+          <Route path="/calendario-mensual" element={<CalendarioMensual />} />
         </Route>
 
         {/* CUALQUIER OTRA → login */}

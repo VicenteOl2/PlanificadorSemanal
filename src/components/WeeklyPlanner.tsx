@@ -16,6 +16,7 @@ import {
 import { DeleteIcon } from '@chakra-ui/icons';
 import { useColorModeValue } from '@chakra-ui/react';
 import BarraNavegacion from './BarraNavegacion';
+import { useEffect } from 'react';
 
 export interface Task {
   id: string;
@@ -23,6 +24,7 @@ export interface Task {
   description?: string;
   day: string;
   completed: boolean;
+  fecha: string;
 }
 
 export interface WeeklyPlan {
@@ -53,6 +55,7 @@ const WeeklyPlanner: React.FC = () => {
         description: taskDescription,
         day: taskDay,
         completed: false,
+        fecha: new Date().toISOString(),
       };
 
       setWeeklyPlan(prev => ({
@@ -79,6 +82,9 @@ const WeeklyPlanner: React.FC = () => {
       tasks: weeklyPlan.tasks.filter(task => task.id !== id),
     });
   };
+  useEffect(() => {
+    localStorage.setItem("tareas", JSON.stringify(weeklyPlan.tasks));
+  }, [weeklyPlan.tasks]);
 
   return (
     <>

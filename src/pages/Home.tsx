@@ -371,6 +371,13 @@ const Home = () => {
 >
   {semanaColaborativa ? "Ver mi planificador personal" : "Ver planificador colaborativo"}
 </Button>
+<Button
+  colorScheme="purple"
+  ml={2}
+  onClick={() => navigate("/calendario-mensual")}
+>
+  Ver calendario mensual
+</Button>
             <Tooltip label="Aquí puedes crear y personalizar tu paleta de colores para clasificar tus tareas por grupos o importancia." fontSize="sm" hasArrow>
               <span style={{ cursor: "pointer", marginLeft: 6 }}>
                 <HelpOutlineIcon fontSize="small" style={{ borderRadius: "50%", background: "#eee", color: "#555" }} />
