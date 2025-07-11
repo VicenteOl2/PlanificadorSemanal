@@ -51,8 +51,9 @@ const Home = () => {
   const [semanaColaborativa, setSemanaColaborativa] = useState<string | null>(
     localStorage.getItem("semanaColaborativa")
   );
-   const [modoColaborativo, setModoColaborativo] = useState<boolean>(!!semanaColaborativa);
-   const [cargandoModo, setCargandoModo] = useState(false);
+  const [modoColaborativo, setModoColaborativo] = useState<boolean>(!!semanaColaborativa);
+  const [cargandoModo, setCargandoModo] = useState(false);
+  const [errorColaboracion, setErrorColaboracion] = useState(false);
   const [codigoInput, setCodigoInput] = useState(""); // Para unirse a una semana
   const [nuevoColor, setNuevoColor] = useState("#e53935");
   const [nuevoNombre, setNuevoNombre] = useState("");
@@ -113,27 +114,59 @@ const Home = () => {
   }, []);
 
   // --- FUNCIONES AUXILIARES ---
-  function getDiasSemana(fecha: Date) {
-    const diaSemana = fecha.getDay() === 0 ? 7 : fecha.getDay();
-    const lunes = new Date(fecha);
-    lunes.setDate(fecha.getDate() - (diaSemana - 1));
-    return dias.map((_, i) => {
+  function getLunes(fecha: Date): Date {
+    const d = new Date(fecha);
+    const day = d.getDay();
+    // Si es domingo (0), retrocede 6 días; si es lunes (1), retrocede 0 días, etc.
+    const diff = d.getDate() - ((day + 6) % 7);
+    d.setDate(diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  function getDiasSemana(lunes: Date) {
+    // Devuelve los 7 días de la semana a partir del lunes dado
+    return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(lunes);
       d.setDate(lunes.getDate() + i);
       return d;
     });
   }
+  const lunes = getLunes(fechaSeleccionada);
+  const diasSemana = getDiasSemana(lunes);
+  const semanaClave = lunes.toISOString().slice(0, 10);
 
-  const diasSemana = getDiasSemana(fechaSeleccionada);
-  const semanaClave = diasSemana[0].toISOString().slice(0, 10);
+  // --- Colaboraciones recientes ---
+  function agregarColaboracionReciente(id: string) {
+    const key = "colaboracionesRecientes";
+    let recientes = JSON.parse(localStorage.getItem(key) || "[]");
+    if (!recientes.includes(id)) {
+      recientes.unshift(id);
+      if (recientes.length > 5) recientes = recientes.slice(0, 5); // Máximo 5
+      localStorage.setItem(key, JSON.stringify(recientes));
+    }
+  }
 
-  // --- CARGAR DATOS DE FIRESTORE EN TIEMPO REAL ---
+  function obtenerColaboracionesRecientes(): string[] {
+    return JSON.parse(localStorage.getItem("colaboracionesRecientes") || "[]");
+  }
+
+  // --- EFECTO PRINCIPAL DE CARGA ---
   useEffect(() => {
+    // Si hay error de colaboración, NO intentes cargar nada más
+    if (errorColaboracion) {
+      setLoading(false);
+      setCargandoModo(false);
+      return;
+    }
     if (!userEmail && !semanaColaborativa) {
       setLoading(false);
+      setCargandoModo(false);
       return;
     }
     if (!userEmail && semanaColaborativa === null) {
+      setLoading(false);
+      setCargandoModo(false);
       return;
     }
     setLoading(true);
@@ -152,16 +185,26 @@ const Home = () => {
         setTareas({});
         setObjetivos({});
         setNotas({});
+        // Si es colaborativo y no existe, muestra mensaje y bloquea recarga
+        if (semanaColaborativa) {
+          setMensaje("La colaboración no existe o fue eliminada.");
+          setSemanaColaborativa(null);
+          localStorage.removeItem("semanaColaborativa");
+          setErrorColaboracion(true); // <-- Marca el error y bloquea recarga
+        }
       }
       setLoading(false);
+      setCargandoModo(false);
     }, (error) => {
       setLoading(false);
+      setCargandoModo(false);
       setMensaje("Error al cargar datos de Firestore. Revisa la consola.");
+      setErrorColaboracion(true);
       console.error("Error al cargar datos de Firestore:", error);
     });
 
     return () => unsubscribe();
-  }, [userEmail, semanaColaborativa]);
+  }, [userEmail, semanaColaborativa, errorColaboracion]);
 
   // --- GUARDAR EN FIRESTORE ---
   const handleGuardar = async () => {
@@ -282,31 +325,10 @@ const Home = () => {
     window.location.href = "/login";
   };
 
-  // --- LOADING ---
-  if (loading) {
-    return (
-      <Box minH="100vh" display="flex" alignItems="center" justifyContent="center">
-        <Spinner size="xl" color="teal.400" />
-        <Text ml={4}>Cargando tu planificador...</Text>
-      </Box>
-    );
-  }
-if (cargandoModo || loading) {
-  return (
-    <Box minH="100vh" display="flex" alignItems="center" justifyContent="center">
-      <Spinner size="xl" color="teal.400" />
-      <Text ml={4}>
-        {semanaColaborativa
-          ? "Cargando planificador colaborativo..."
-          : "Cargando planificador personal..."}
-      </Text>
-    </Box>
-  );
-}
   // --- RETURN ---
   return (
     <Box minH="100vh" p={0} style={{
-      backgroundColor: "#fdf6e3",
+      backgroundColor: "#fdf8e4",
       backgroundImage: `
         linear-gradient(to right, #e0e0e0 1px, transparent 1px),
         linear-gradient(to bottom, #e0e0e0 1px, transparent 1px)
@@ -317,34 +339,38 @@ if (cargandoModo || loading) {
       <Box maxW="1200px" mx="auto" mt={4} p={2} position="relative">
         {/* Barra superior con título y menú */}
         <HStack justify="space-between" align="center" mb={4}>
-            <HStack>
-  <Heading size="lg" mb={0}>
-    {semanaColaborativa ? "Planificador semanal colaborativo" : "Planificador semanal"}
-  </Heading>
-  <Button
-    size="sm"
-    colorScheme={semanaColaborativa ? "teal" : "gray"}
-    variant={semanaColaborativa ? "solid" : "outline"}
-    ml={4}
-    onClick={() => {
-      if (semanaColaborativa) {
-        setSemanaColaborativa(null);
-        setMensaje("Has vuelto a tu planificador personal.");
+          <HStack>
+            <Heading size="lg" mb={0}>
+              {semanaColaborativa ? "Planificador semanal colaborativo" : "Planificador semanal"}
+            </Heading>
+         <Button
+  size="sm"
+  colorScheme={semanaColaborativa ? "teal" : "gray"}
+  variant={semanaColaborativa ? "solid" : "outline"}
+  ml={4}
+  onClick={() => {
+    setCargandoModo(true);
+    setErrorColaboracion(false);
+    if (semanaColaborativa) {
+      setSemanaColaborativa(null);
+      setMensaje("Has vuelto a tu planificador personal.");
+    } else {
+      const colab = localStorage.getItem("semanaColaborativa");
+      if (colab) {
+        setSemanaColaborativa(colab);
+        setMensaje("Has cambiado al planificador colaborativo.");
       } else {
-        const colab = localStorage.getItem("semanaColaborativa");
-        if (colab) {
-          setSemanaColaborativa(colab);
-          setMensaje("Has cambiado al planificador colaborativo.");
-        } else {
-          setMensaje("No tienes colaboración activa. Únete o crea una desde el menú.");
-        }
+        setMensaje("No tienes colaboración activa. Únete o crea una desde el menú.");
+        colaboracionModal.onOpen(); // <-- Abre el modal para ingresar/cambiar código
+        setCargandoModo(false); // Detén el spinner si no hay colaboración
+        return;
       }
-      setTimeout(() => setMensaje(""), 2000);
-      setTimeout(() => setCargandoModo(false), 800); // Simula carga breve
-    }}
-  >
-    {semanaColaborativa ? "Ver mi planificador personal" : "Ver planificador colaborativo"}
-  </Button>
+    }
+    setTimeout(() => setMensaje(""), 2000);
+  }}
+>
+  {semanaColaborativa ? "Ver mi planificador personal" : "Ver planificador colaborativo"}
+</Button>
             <Tooltip label="Aquí puedes crear y personalizar tu paleta de colores para clasificar tus tareas por grupos o importancia." fontSize="sm" hasArrow>
               <span style={{ cursor: "pointer", marginLeft: 6 }}>
                 <HelpOutlineIcon fontSize="small" style={{ borderRadius: "50%", background: "#eee", color: "#555" }} />
@@ -438,6 +464,29 @@ if (cargandoModo || loading) {
                   Selecciona cualquier día y el planificador mostrará la semana correspondiente.
                 </Text>
               </VStack>
+              {/* Colaboraciones recientes */}
+              {obtenerColaboracionesRecientes().length > 0 && (
+                <Box mb={3}>
+                  <Text fontSize="sm" color="gray.600" mb={1}>Colaboraciones recientes:</Text>
+                  {obtenerColaboracionesRecientes().map(id => (
+                    <Button
+                      key={id}
+                      size="xs"
+                      variant="outline"
+                      colorScheme="teal"
+                      mr={2}
+                      mb={1}
+                      onClick={() => {
+                        setSemanaColaborativa(id);
+                        setMensaje(`Has vuelto a la colaboración ${id.split("_")[0]}`);
+                        colaboracionModal.onClose();
+                      }}
+                    >
+                      {id}
+                    </Button>
+                  ))}
+                </Box>
+              )}
               {/* Confirmación de semana seleccionada */}
               <Box mb={3} p={2} bg="teal.50" borderRadius="md" border="1px solid #b2f5ea">
                 <Text fontWeight="bold" color="teal.700">
@@ -450,13 +499,15 @@ if (cargandoModo || loading) {
               {/* Colaboración (ahora componente separado) */}
               <Collaborate
                 semanaColaborativa={semanaColaborativa}
-                setSemanaColaborativa={setSemanaColaborativa}
+                setSemanaColaborativa={id => {
+                  setSemanaColaborativa(id);
+                  if (id) agregarColaboracionReciente(id);
+                }}
                 codigoInput={codigoInput}
                 setCodigoInput={setCodigoInput}
                 mensaje={mensaje}
                 setMensaje={setMensaje}
                 diasSemana={diasSemana}
-                semanaClave={semanaClave}
                 userEmail={userEmail}
                 nanoid={nanoid}
                 db={db}

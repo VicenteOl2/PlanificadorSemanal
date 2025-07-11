@@ -10,13 +10,20 @@ interface CollaborateProps {
   mensaje: string;
   setMensaje: (v: string) => void;
   diasSemana: Date[];
-  semanaClave: string;
   userEmail: string | null;
   nanoid: (n: number) => string;
   db: Firestore;
   doc: typeof doc;
   setDoc: typeof setDoc;
   getDoc: typeof getDoc;
+}
+
+// --- Función para obtener el lunes de la semana ---
+function getLunes(fecha: Date): Date {
+  const d = new Date(fecha);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Lunes como primer día
+  return new Date(d.setDate(diff));
 }
 
 // --- Custom hook para presencia colaborativa ---
@@ -43,7 +50,7 @@ export function usePresenciaColaborativa({
     return () => unsubscribe();
   }, [semanaColaborativa, db]);
 
- const setPresencia = async (dia: string, value: string) => {
+  const setPresencia = async (dia: string, value: string) => {
     if (semanaColaborativa && userEmail) {
       const ref = doc(db, "semanas", semanaColaborativa);
       const snap = await getDoc(ref);
@@ -71,7 +78,6 @@ const Collaborate: React.FC<CollaborateProps> = ({
   mensaje,
   setMensaje,
   diasSemana,
-  semanaClave,
   userEmail,
   nanoid,
   db,
@@ -81,6 +87,10 @@ const Collaborate: React.FC<CollaborateProps> = ({
 }) => {
   const [diasColaboracion, setDiasColaboracion] = useState<number>(7);
   const [usuarios, setUsuarios] = useState<string[]>([]);
+
+  // Calcula el lunes y la clave de la semana seleccionada
+  const lunes = getLunes(diasSemana[0]);
+  const semanaClave = lunes.toISOString().slice(0, 10);
 
   useEffect(() => {
     const guardada = localStorage.getItem("semanaColaborativa");
@@ -112,19 +122,17 @@ const Collaborate: React.FC<CollaborateProps> = ({
     }
   }, [semanaColaborativa, db, doc, getDoc]);
 
-
-
   return (
     <>
       {!userEmail ? (
-  <Text color="red.500" mb={2}>
-    No has iniciado sesión. Por favor, inicia sesión para colaborar.
-  </Text>
-) : (
-  <Text color="gray.600" mb={2}>
-    Sesión iniciada como: <b>{userEmail}</b>
-  </Text>
-)}
+        <Text color="red.500" mb={2}>
+          No has iniciado sesión. Por favor, inicia sesión para colaborar.
+        </Text>
+      ) : (
+        <Text color="gray.600" mb={2}>
+          Sesión iniciada como: <b>{userEmail}</b>
+        </Text>
+      )}
       {!semanaColaborativa ? (
         <VStack mb={4}>
           <Select
